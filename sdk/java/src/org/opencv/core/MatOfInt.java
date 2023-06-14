@@ -1,5 +1,7 @@
 package org.opencv.core;
 
+import android.util.Log;
+
 import java.util.Arrays;
 import java.util.List;
 
@@ -51,6 +53,10 @@ public class MatOfInt extends Mat {
 
     public int[] toArray() {
         int num = checkVector(_channels, _depth);
+        Log.d("MatOfInt", "_channels = " + _channels);
+        Log.d("MatOfInt", "_depth = " + _depth);
+        Log.d("MatOfInt", "num = " + num);
+
         if(num < 0)
             throw new RuntimeException("Native Mat has unexpected type or size: " + toString());
         int[] a = new int[num * _channels];

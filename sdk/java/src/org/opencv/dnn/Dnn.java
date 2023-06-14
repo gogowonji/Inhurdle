@@ -943,7 +943,8 @@ public class Dnn {
         Mat bboxes_mat = bboxes;
         Mat scores_mat = scores;
         Mat indices_mat = indices;
-        NMSBoxes_2(bboxes_mat.nativeObj, scores_mat.nativeObj, score_threshold, nms_threshold, indices_mat.nativeObj);
+        Log.d("nmsboxes", "boxes.size() = " + bboxes_mat.size());
+        Log.d("nmsboxes", "confidences.size() = " + scores_mat.size());
         Log.d("nmsboxes","fin");
     }
 
