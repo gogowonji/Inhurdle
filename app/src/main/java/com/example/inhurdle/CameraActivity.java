@@ -75,7 +75,7 @@ public class CameraActivity extends AppCompatActivity implements CvCameraViewLis
                     {
                         Log.i(TAG, "OpenCV loaded successfully");
                         mOpenCvCameraView.enableView();
-                        Log.i(TAG, "enableView");
+                        Log.i(TAG, "CameraView is enable");
                     } break;
                     default:
                     {
@@ -100,12 +100,13 @@ public class CameraActivity extends AppCompatActivity implements CvCameraViewLis
                         new String[]{android.Manifest.permission_group.CAMERA,
                                 Manifest.permission.WRITE_EXTERNAL_STORAGE}, 1);
             } else {
-                Log.i("MainActivity", "get permission");
+                Log.i(TAG, "Permission pass");
             }
         }
         if(_Permission){
-            //여기서 카메라뷰 받아옴
-            onCameraPermissionGranted();
+            //(여기서 카메라뷰 받아옴 - 이라고 써놓은거 가져옴)
+            onCameraPermissionGranted(); //카메라 접근 권한
+            Log.i(TAG, "Permission success");
         }
     }
 
@@ -117,11 +118,12 @@ public class CameraActivity extends AppCompatActivity implements CvCameraViewLis
         }
         for (CameraBridgeViewBase cameraBridgeViewBase: cameraViews) {
             if (cameraBridgeViewBase != null) {
-                cameraBridgeViewBase.setCameraPermissionGranted();
+                cameraBridgeViewBase.setCameraPermissionGranted(); //포인트
             }
         }
     }
 
+    //카메라 접근 권한
     protected List<? extends CameraBridgeViewBase> getCameraViewList() {
         return Collections.singletonList(mOpenCvCameraView);
     }
@@ -163,21 +165,23 @@ public class CameraActivity extends AppCompatActivity implements CvCameraViewLis
     public Mat onCameraFrame(CvCameraViewFrame inputFrame) {
         Log.d(TAG, "onCameraFrame");
         Mat frame = inputFrame.rgba();
-        Imgproc.cvtColor(frame, frame, Imgproc.COLOR_RGBA2RGB);
+        Imgproc.cvtColor(frame, frame, Imgproc.COLOR_RGBA2RGB); //이미지 프로세싱
+        Log.d(TAG, "Imgproc");
         Size frame_size = new Size(256, 256);
         Scalar mean = new Scalar(127.5);
 
         Mat blob = Dnn.blobFromImage(frame, 1.0 / 255.0, frame_size, mean, true, false);
-        //save_mat(blob);
+        //뉴런 네트워크에 이미지 넣기
         net.setInput(blob);
-        Log.d(TAG, "setInput");
+        Log.d(TAG, "Dnn.blobFromImage");
 
-        List<Mat> result = new ArrayList<>();
-        List<String> outBlobNames = net.getUnconnectedOutLayersNames();
-        Log.d(TAG, "before forward");
-        net.forward(result, outBlobNames);
-        Log.d(TAG, "after forward");
-        float confThreshold = 0.5f;
+
+        List<Mat> result = new ArrayList<>(); //yolov4 레이어
+        List<String> outBlobNames = net.getUnconnectedOutLayersNames(); //yolov4 레이어 이름
+        net.forward(result, outBlobNames); //순전파 진행 - onCreate()에서 net으로 이미 받아옴
+        Log.d(TAG, "forward");
+
+        float confThreshold = 0.3f; //0.3 확률만 출력
 
         for (int i = 0; i < result.size(); ++i) {
             // each row is a candidate detection, the 1st 4 numbers are
@@ -187,31 +191,33 @@ public class CameraActivity extends AppCompatActivity implements CvCameraViewLis
                 Mat row = level.row(j);
                 Mat scores = row.colRange(5, level.cols());
                 Core.MinMaxLocResult mm = Core.minMaxLoc(scores);
-                float confidence = (float) mm.maxVal;
-                Point classIdPoint = mm.maxLoc;
-                if (confidence > confThreshold) {
+                float confidence = (float) mm.maxVal; //객체 감지 퍼센트
+                Point classIdPoint = mm.maxLoc; //여러개의 클래스들 중에 가장 정확도가 높은 클래스 찾기
+
+
+                if (confidence > confThreshold) { //threshold보다 높게 감지된 객체만 표시하기
 
                     int centerX = (int) (row.get(0, 0)[0] * frame.cols());
                     int centerY = (int) (row.get(0, 1)[0] * frame.rows());
                     int width = (int) (row.get(0, 2)[0] * frame.cols());
                     int height = (int) (row.get(0, 3)[0] * frame.rows());
 
-                    int left = (int) (centerX - width * 0.5);
-                    int top =(int)(centerY - height * 0.5);
-                    int right =(int)(centerX + width * 0.5);
-                    int bottom =(int)(centerY + height * 0.5);
+                    int left = (int)(centerX - width * 0.5);
+                    int top = (int)(centerY - height * 0.5);
+                    int right = (int)(centerX + width * 0.5);
+                    int bottom = (int)(centerY + height * 0.5);
 
                     Point left_top = new Point(left, top);
                     Point right_bottom=new Point(right, bottom);
                     Point label_left_top = new Point(left, top-5);
                     DecimalFormat df = new DecimalFormat("#.##");
 
-                    int class_id = (int) classIdPoint.x;
-                    String label= classNames.get(class_id) + ": " + df.format(confidence);
-                    Scalar color= colors.get(class_id);
+                    int class_id = (int) classIdPoint.x; //클래스명
+                    String label= classNames.get(class_id) + ": " + df.format(confidence); //감지 퍼센트
+                    Scalar color= colors.get(class_id); //클래스별 컬러
 
-                    Imgproc.rectangle(frame, left_top,right_bottom , color, 3, 2);
-                    Imgproc.putText(frame, label, label_left_top, Imgproc.FONT_HERSHEY_SIMPLEX, 1, new Scalar(0, 0, 0), 4);
+                    Imgproc.rectangle(frame, left_top, right_bottom, color, 3, 2);
+                    Imgproc.putText(frame, label, label_left_top, Imgproc.FONT_HERSHEY_SIMPLEX, 1, new Scalar(0, 0, 0), 4); //글자 그림자 넣어주려고
                     Imgproc.putText(frame, label, label_left_top, Imgproc.FONT_HERSHEY_SIMPLEX, 1, new Scalar(255, 255, 255), 2);
                 }
             }
