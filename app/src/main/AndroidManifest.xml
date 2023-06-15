@@ -62,7 +62,7 @@
             android:name=".CameraActivity"
             android:configChanges="keyboardHidden|orientation"
             android:exported="true"
-            android:screenOrientation="landscape">
+            android:screenOrientation="portrait">
 
         </activity>
     </application>

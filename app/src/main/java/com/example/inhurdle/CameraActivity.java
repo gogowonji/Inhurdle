@@ -148,7 +148,7 @@ public class CameraActivity extends AppCompatActivity implements CvCameraViewLis
         Log.d(TAG, "onCameraViewStarted");
         String modelConfiguration = getAssetsFile("yolov4-custom.cfg", this);
         String modelWeights = getAssetsFile("yolov4-custom_best.weights", this);
-        net = Dnn.readNetFromDarknet(modelConfiguration, modelWeights);
+        net = Dnn.readNetFromDarknet(modelConfiguration, modelWeights); //모델 로딩
         Log.i(TAG, "Dnn.readNetFromDarknet");
     }
 
