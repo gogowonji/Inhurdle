@@ -26,22 +26,26 @@
         android:layout_below="@+id/Main_logo"
         android:layout_alignParentStart="true"
         android:layout_alignParentEnd="true"
-        android:layout_centerVertical="true"
-        android:layout_marginTop="20dp"
+        android:layout_alignParentBottom="true"
+        android:layout_marginStart="80dp"
+        android:layout_marginTop="12dp"
+        android:layout_marginEnd="81dp"
+        android:layout_marginBottom="275dp"
         android:background="#000000"
-        android:src="@drawable/camera" />
+        android:src="@drawable/camera_button"/>
 
     <ImageButton
         android:id="@+id/Use_btn"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_below="@+id/Camera_btn"
         android:layout_alignParentStart="true"
         android:layout_alignParentEnd="true"
-        android:layout_marginTop="-5dp"
-        android:layout_centerVertical="true"
+        android:layout_alignParentBottom="true"
+        android:layout_marginStart="80dp"
+        android:layout_marginEnd="80dp"
+        android:layout_marginBottom="30dp"
         android:background="#000000"
-        android:src="@drawable/use" />
+        android:src="@drawable/use_button"/>
 
 
 </RelativeLayout>

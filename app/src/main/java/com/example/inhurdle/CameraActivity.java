@@ -60,7 +60,7 @@ public class CameraActivity extends AppCompatActivity implements CvCameraViewLis
     BaseLoaderCallback mLoaderCallback;
     private MediaPlayer mediaPlayer;
 
-    private static boolean[]canSpeak = new boolean[4];
+    private static boolean[]canSpeak = new boolean[4]; //검출된 물체를 한번씩 음성 안내 하기 위한 배열
 
 
     @Override
@@ -223,7 +223,7 @@ public class CameraActivity extends AppCompatActivity implements CvCameraViewLis
                     DecimalFormat df = new DecimalFormat("#.##");
 
                     int class_id = (int) classIdPoint.x; //클래스명
-                    String label= classNames.get(class_id) + ": " + df.format(confidence); //감지 퍼센트
+                    String label= classNames.get(class_id) + ": " + df.format(confidence); //클래스명 + 감지 퍼센트
                     //String className = classNames.get(class_id);//클래스명 받아오기
                     Scalar color= colors.get(class_id); //클래스별 컬러
 
