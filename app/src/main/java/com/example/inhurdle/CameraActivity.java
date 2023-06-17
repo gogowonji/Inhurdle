@@ -23,6 +23,7 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.text.DecimalFormat;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Random;
@@ -59,7 +60,7 @@ public class CameraActivity extends AppCompatActivity implements CvCameraViewLis
     BaseLoaderCallback mLoaderCallback;
     private MediaPlayer mediaPlayer;
 
-    int once;
+    private static boolean[]canSpeak = new boolean[4];
 
 
     @Override
@@ -186,8 +187,10 @@ public class CameraActivity extends AppCompatActivity implements CvCameraViewLis
         List<String> outBlobNames = net.getUnconnectedOutLayersNames(); //yolov4 레이어 이름
         net.forward(result, outBlobNames); //순전파 진행 - onCreate()에서 net으로 이미 받아옴
         Log.d(TAG, "forward");
-        once = 0;
+
         float confThreshold = 0.3f; //0.3 확률만 출력
+
+        Arrays.fill(canSpeak,false); //프레임 시작시 false로 초기화
 
         for (int i = 0; i < result.size(); ++i) {
 
@@ -229,49 +232,54 @@ public class CameraActivity extends AppCompatActivity implements CvCameraViewLis
                     Imgproc.putText(frame, label, label_left_top, Imgproc.FONT_HERSHEY_SIMPLEX, 1, new Scalar(255, 255, 255), 2);
 
                     Log.i(TAG, "label - " + label);
-                    Log.i(TAG, "class_id : " + class_id);
-                    speakLabel(class_id);
+                    canSpeak[class_id] = true;
 
-                    Log.i(TAG, "once : " + once);
+
                 }
 
             }
-            once++;
+
         }
-        Log.i(TAG, "한 프레임");
+
+        speakClasses(canSpeak);
+        Log.i(TAG, "------------------one frame------------------");
         return frame;
     }
 
-    public void speakLabel(int class_id) {
-         //한 번만
-        //Log.i(TAG, "speakLabel class_id : " + class_id);
-        if(once == 0) {
-            if (class_id == 0) {
+    public void speakClasses(boolean bool[]) {
+
+        try {
+            if (bool[0]) {
                 mediaPlayer = MediaPlayer.create(CameraActivity.this, R.raw.bollard);
                 mediaPlayer.start();
                 Log.i(TAG, "bollard");
-
-
-            }else if (class_id == 1) {
+                Thread.sleep(3000);
+            }
+            if (bool[1]) {
                 mediaPlayer = MediaPlayer.create(CameraActivity.this, R.raw.pole);
                 mediaPlayer.start();
                 Log.i(TAG, "pole");
+                Thread.sleep(3000);
 
-            }else if (class_id == 2) {
+            }
+            if (bool[2]) {
                 mediaPlayer = MediaPlayer.create(CameraActivity.this, R.raw.person);
                 mediaPlayer.start();
                 Log.i(TAG, "person");
+                Thread.sleep(3000);
 
-
-            }else {
+            }
+            if(bool[3]){
                 //mediaPlayer = MediaPlayer.create(CameraActivity.this, R.raw.use);
                 //mediaPlayer.start();
                 Log.i(TAG, "etc");
+                Thread.sleep(3000);
             }
 
-        }else{
-            Log.i(TAG, "한 번만 호출 할거야 | once : " + once);
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
         }
+
     }
 
     private boolean checkPermissions() {
