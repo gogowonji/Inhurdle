@@ -6,9 +6,11 @@ import android.content.Context;
 import android.content.pm.PackageManager;
 import android.content.res.AssetManager;
 import android.graphics.Bitmap;
+import android.media.MediaPlayer;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
+import android.os.Handler;
 import android.provider.MediaStore;
 import android.util.Log;
 import androidx.appcompat.app.AppCompatActivity;
@@ -55,6 +57,10 @@ public class CameraActivity extends AppCompatActivity implements CvCameraViewLis
     private boolean permissionGranted = false;
 
     BaseLoaderCallback mLoaderCallback;
+    private MediaPlayer mediaPlayer;
+
+    int once;
+
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -180,12 +186,11 @@ public class CameraActivity extends AppCompatActivity implements CvCameraViewLis
         List<String> outBlobNames = net.getUnconnectedOutLayersNames(); //yolov4 레이어 이름
         net.forward(result, outBlobNames); //순전파 진행 - onCreate()에서 net으로 이미 받아옴
         Log.d(TAG, "forward");
-
+        once = 0;
         float confThreshold = 0.3f; //0.3 확률만 출력
 
         for (int i = 0; i < result.size(); ++i) {
-            // each row is a candidate detection, the 1st 4 numbers are
-            // [center_x, center_y, width, height], followed by (N-4) class probabilities
+
             Mat level = result.get(i);
             for (int j = 0; j < level.rows(); ++j) {
                 Mat row = level.row(j);
@@ -207,25 +212,67 @@ public class CameraActivity extends AppCompatActivity implements CvCameraViewLis
                     int right = (int)(centerX + width * 0.5);
                     int bottom = (int)(centerY + height * 0.5);
 
+
                     Point left_top = new Point(left, top);
                     Point right_bottom=new Point(right, bottom);
+
                     Point label_left_top = new Point(left, top-5);
                     DecimalFormat df = new DecimalFormat("#.##");
 
                     int class_id = (int) classIdPoint.x; //클래스명
                     String label= classNames.get(class_id) + ": " + df.format(confidence); //감지 퍼센트
+                    //String className = classNames.get(class_id);//클래스명 받아오기
                     Scalar color= colors.get(class_id); //클래스별 컬러
 
                     Imgproc.rectangle(frame, left_top, right_bottom, color, 3, 2);
-                    Imgproc.putText(frame, label, label_left_top, Imgproc.FONT_HERSHEY_SIMPLEX, 1, new Scalar(0, 0, 0), 4); //글자 그림자 넣어주려고
+                    Imgproc.putText(frame, label, label_left_top, Imgproc.FONT_HERSHEY_SIMPLEX, 1, new Scalar(0, 0, 0), 4); //글자 그림자 넣어 주려고
                     Imgproc.putText(frame, label, label_left_top, Imgproc.FONT_HERSHEY_SIMPLEX, 1, new Scalar(255, 255, 255), 2);
+
+                    Log.i(TAG, "label - " + label);
+                    Log.i(TAG, "class_id : " + class_id);
+                    speakLabel(class_id);
+
+                    Log.i(TAG, "once : " + once);
                 }
+
             }
+            once++;
         }
+        Log.i(TAG, "한 프레임");
         return frame;
     }
 
+    public void speakLabel(int class_id) {
+         //한 번만
+        //Log.i(TAG, "speakLabel class_id : " + class_id);
+        if(once == 0) {
+            if (class_id == 0) {
+                mediaPlayer = MediaPlayer.create(CameraActivity.this, R.raw.bollard);
+                mediaPlayer.start();
+                Log.i(TAG, "bollard");
 
+
+            }else if (class_id == 1) {
+                mediaPlayer = MediaPlayer.create(CameraActivity.this, R.raw.pole);
+                mediaPlayer.start();
+                Log.i(TAG, "pole");
+
+            }else if (class_id == 2) {
+                mediaPlayer = MediaPlayer.create(CameraActivity.this, R.raw.person);
+                mediaPlayer.start();
+                Log.i(TAG, "person");
+
+
+            }else {
+                //mediaPlayer = MediaPlayer.create(CameraActivity.this, R.raw.use);
+                //mediaPlayer.start();
+                Log.i(TAG, "etc");
+            }
+
+        }else{
+            Log.i(TAG, "한 번만 호출 할거야 | once : " + once);
+        }
+    }
 
     private boolean checkPermissions() {
 
@@ -339,5 +386,9 @@ public class CameraActivity extends AppCompatActivity implements CvCameraViewLis
         super.onDestroy();
         if (mOpenCvCameraView != null)
             mOpenCvCameraView.disableView();
+        if(mediaPlayer != null){
+            mediaPlayer.release();
+            mediaPlayer = null;
+        }
     }
 }
