@@ -5,13 +5,10 @@ import android.Manifest;
 import android.content.Context;
 import android.content.pm.PackageManager;
 import android.content.res.AssetManager;
-import android.graphics.Bitmap;
 import android.media.MediaPlayer;
 import android.os.Build;
 import android.os.Bundle;
-import android.os.Environment;
-import android.os.Handler;
-import android.provider.MediaStore;
+
 import android.util.Log;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
@@ -20,7 +17,6 @@ import java.io.BufferedInputStream;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.OutputStream;
 import java.text.DecimalFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -32,9 +28,8 @@ import org.opencv.android.BaseLoaderCallback;
 import org.opencv.android.CameraBridgeViewBase;
 import org.opencv.android.LoaderCallbackInterface;
 import org.opencv.android.OpenCVLoader;
-import org.opencv.android.Utils;
 import org.opencv.core.Core;
-import org.opencv.core.CvType;
+
 import org.opencv.core.Mat;
 import org.opencv.core.Point;
 import org.opencv.core.Scalar;
@@ -48,9 +43,6 @@ import org.opencv.imgproc.Imgproc;
 
 public class CameraActivity extends AppCompatActivity implements CvCameraViewListener2 {
     private static final String TAG = "CameraActivity";
-    private static final int PERMISSIONS_REQUEST = 1;
-    private static final String PERMISSION_CAMERA = Manifest.permission.CAMERA;
-    private static final String PERMISSION_STORAGE  = Manifest.permission.WRITE_EXTERNAL_STORAGE;
     private static List<String> classNames;
     private static List<Scalar> colors=new ArrayList<>();
     private Net net;
@@ -60,7 +52,7 @@ public class CameraActivity extends AppCompatActivity implements CvCameraViewLis
     BaseLoaderCallback mLoaderCallback;
     private MediaPlayer mediaPlayer;
 
-    private static boolean[]canSpeak = new boolean[4]; //검출된 물체를 한번씩 음성 안내 하기 위한 배열
+    private static boolean[]canSpeak = new boolean[4]; //장애물을 중복 없이 음성 안내 하기 위한 배열
 
 
     @Override
@@ -100,7 +92,7 @@ public class CameraActivity extends AppCompatActivity implements CvCameraViewLis
     protected void onStart() {
         super.onStart();
         boolean _Permission = true; //변수 추가
-        if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.M){//최소 버전보다 버전이 높은지 확인
+        if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.M){ //최소 버전보다 버전이 높은지 확인
             if(ContextCompat.checkSelfPermission(CameraActivity.this,
                     android.Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
                 ActivityCompat.requestPermissions(CameraActivity.this,
@@ -111,7 +103,6 @@ public class CameraActivity extends AppCompatActivity implements CvCameraViewLis
             }
         }
         if(_Permission){
-            //(여기서 카메라뷰 받아옴 - 이라고 써놓은거 가져옴)
             onCameraPermissionGranted(); //카메라 접근 권한
             Log.i(TAG, "Permission success");
         }
@@ -125,7 +116,7 @@ public class CameraActivity extends AppCompatActivity implements CvCameraViewLis
         }
         for (CameraBridgeViewBase cameraBridgeViewBase: cameraViews) {
             if (cameraBridgeViewBase != null) {
-                cameraBridgeViewBase.setCameraPermissionGranted(); //포인트
+                cameraBridgeViewBase.setCameraPermissionGranted(); //없으면 카메라 화면이 안 켜짐
             }
         }
     }
@@ -155,7 +146,7 @@ public class CameraActivity extends AppCompatActivity implements CvCameraViewLis
         Log.d(TAG, "onCameraViewStarted");
         String modelConfiguration = getAssetsFile("yolov4-custom.cfg", this);
         String modelWeights = getAssetsFile("yolov4-custom_best.weights", this);
-        net = Dnn.readNetFromDarknet(modelConfiguration, modelWeights); //모델 로딩
+        net = Dnn.readNetFromDarknet(modelConfiguration, modelWeights); //yolo 모델 로딩
         Log.i(TAG, "Dnn.readNetFromDarknet");
     }
 
@@ -170,6 +161,8 @@ public class CameraActivity extends AppCompatActivity implements CvCameraViewLis
 
     @Override
     public Mat onCameraFrame(CvCameraViewFrame inputFrame) {
+        //가장 중요한 함수
+
         Log.d(TAG, "onCameraFrame");
         Mat frame = inputFrame.rgba();
         Imgproc.cvtColor(frame, frame, Imgproc.COLOR_RGBA2RGB); //이미지 프로세싱
@@ -185,13 +178,15 @@ public class CameraActivity extends AppCompatActivity implements CvCameraViewLis
 
         List<Mat> result = new ArrayList<>(); //yolov4 레이어
         List<String> outBlobNames = net.getUnconnectedOutLayersNames(); //yolov4 레이어 이름
-        net.forward(result, outBlobNames); //순전파 진행 - onCreate()에서 net으로 이미 받아옴
+        net.forward(result, outBlobNames); //순전파 진행 - onCameraViewStarted()에서 net으로 이미 받아옴
         Log.d(TAG, "forward");
 
-        float confThreshold = 0.3f; //0.3 확률만 출력
+        float confThreshold = 0.3f; //0.3 이상의 확률만 출력
 
-        Arrays.fill(canSpeak,false); //프레임 시작시 false로 초기화
+        Arrays.fill(canSpeak,false); //Bounding Box 출력 이전, 클래스 안내 위한 배열 false로 초기화
 
+
+        //Bounding Box 출력
         for (int i = 0; i < result.size(); ++i) {
 
             Mat level = result.get(i);
@@ -205,10 +200,15 @@ public class CameraActivity extends AppCompatActivity implements CvCameraViewLis
 
                 if (confidence > confThreshold) { //threshold보다 높게 감지된 객체만 표시하기
 
-                    int centerX = (int) (row.get(0, 0)[0] * frame.cols());
-                    int centerY = (int) (row.get(0, 1)[0] * frame.rows());
-                    int width = (int) (row.get(0, 2)[0] * frame.cols());
-                    int height = (int) (row.get(0, 3)[0] * frame.rows());
+                    int centerX = (int) (row.get(0, 0)[0] * frame.cols()); //bounding box 중앙 x좌표
+                    int centerY = (int) (row.get(0, 1)[0] * frame.rows()); //box 중앙 y좌표
+                    int width = (int) (row.get(0, 2)[0] * frame.cols()); //box width
+                    int height = (int) (row.get(0, 3)[0] * frame.rows());//box height
+
+                    Log.i(TAG, "frame.cols() :" + frame.cols());
+                    Log.i(TAG, "frame.rows() :" + frame.rows());
+                    Log.i(TAG, "width :" + width);
+                    Log.i(TAG, "height :" + height);
 
                     int left = (int)(centerX - width * 0.5);
                     int top = (int)(centerY - height * 0.5);
@@ -220,12 +220,12 @@ public class CameraActivity extends AppCompatActivity implements CvCameraViewLis
                     Point right_bottom=new Point(right, bottom);
 
                     Point label_left_top = new Point(left, top-5);
-                    DecimalFormat df = new DecimalFormat("#.##");
+                    DecimalFormat df = new DecimalFormat("#.##"); //클래스 확률 포맷
 
                     int class_id = (int) classIdPoint.x; //클래스명
-                    String label= classNames.get(class_id) + ": " + df.format(confidence); //클래스명 + 감지 퍼센트
-                    //String className = classNames.get(class_id);//클래스명 받아오기
+                    String label= classNames.get(class_id) + ": " + df.format(confidence); //클래스명 + 클래스 확률
                     Scalar color= colors.get(class_id); //클래스별 컬러
+
 
                     Imgproc.rectangle(frame, left_top, right_bottom, color, 3, 2);
                     Imgproc.putText(frame, label, label_left_top, Imgproc.FONT_HERSHEY_SIMPLEX, 1, new Scalar(0, 0, 0), 4); //글자 그림자 넣어 주려고
@@ -241,7 +241,7 @@ public class CameraActivity extends AppCompatActivity implements CvCameraViewLis
 
         }
 
-        speakClasses(canSpeak);
+        speakClasses(canSpeak); //음성 안내
         Log.i(TAG, "------------------one frame------------------");
         return frame;
     }
@@ -249,11 +249,11 @@ public class CameraActivity extends AppCompatActivity implements CvCameraViewLis
     public void speakClasses(boolean bool[]) {
 
         try {
-            if (bool[0]) {
+            if (bool[0]) { //obj.txt의 클래스명 순서와 동일 (0:bollard 1:pole 2:person 3:etc)
                 mediaPlayer = MediaPlayer.create(CameraActivity.this, R.raw.bollard);
                 mediaPlayer.start();
                 Log.i(TAG, "bollard");
-                Thread.sleep(3000);
+                Thread.sleep(3000); //음성 겹치지 않게 3초 기다리기
             }
             if (bool[1]) {
                 mediaPlayer = MediaPlayer.create(CameraActivity.this, R.raw.pole);
@@ -270,8 +270,8 @@ public class CameraActivity extends AppCompatActivity implements CvCameraViewLis
 
             }
             if(bool[3]){
-                //mediaPlayer = MediaPlayer.create(CameraActivity.this, R.raw.use);
-                //mediaPlayer.start();
+                mediaPlayer = MediaPlayer.create(CameraActivity.this, R.raw.etc);
+                mediaPlayer.start();
                 Log.i(TAG, "etc");
                 Thread.sleep(3000);
             }
@@ -281,21 +281,6 @@ public class CameraActivity extends AppCompatActivity implements CvCameraViewLis
         }
 
     }
-
-    private boolean checkPermissions() {
-
-        int permissionCheck = ContextCompat.checkSelfPermission(this,
-                Manifest.permission.CAMERA);
-
-        if (permissionCheck != PackageManager.PERMISSION_GRANTED) {
-            requestPermissions(new String[] {PERMISSION_CAMERA, PERMISSION_STORAGE}, PERMISSIONS_REQUEST);
-            return false;
-        } else {
-            return true;
-        }
-
-    }
-
 
 
     private static String getAssetsFile(String file, Context context) {
@@ -354,7 +339,6 @@ public class CameraActivity extends AppCompatActivity implements CvCameraViewLis
     }
 
 
-
     private Scalar randomColor() {
         Random random = new Random();
         int r = random.nextInt(255);
@@ -362,32 +346,6 @@ public class CameraActivity extends AppCompatActivity implements CvCameraViewLis
         int b = random.nextInt(255);
         return new Scalar(r,g,b);
     }
-
-
-
-    private void save_mat(Mat mat)
-    {
-        String path = Environment.getExternalStorageDirectory().toString();
-        OutputStream fOut = null;
-        File file = new File(path, "screen.jpg"); // the File to save , append increasing numeric counter to prevent files from getting overwritten.
-        try {
-            Bitmap bmp = Bitmap.createBitmap(mat.width(),mat.height(), Bitmap.Config.ARGB_8888);
-            Mat tmp = new Mat (mat.width(),mat.height(), CvType.CV_8UC1,new Scalar(4));
-            Imgproc.cvtColor(mat, tmp, Imgproc.COLOR_RGB2BGRA);
-            //Imgproc.cvtColor(seedsImage, tmp, Imgproc.COLOR_GRAY2RGBA, 4);
-            Utils.matToBitmap(tmp, bmp);
-            fOut = new FileOutputStream(file);
-            bmp.compress(Bitmap.CompressFormat.JPEG, 85, fOut); // saving the Bitmap to a file compressed as a JPEG with 85% compression rate
-            fOut.flush(); // Not really required
-            fOut.close(); // do not forget to close the stream
-            MediaStore.Images.Media.insertImage(getContentResolver(),file.getAbsolutePath(),file.getName(),file.getName());
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-
-    }
-
-
 
     @Override
     public void onDestroy() {
