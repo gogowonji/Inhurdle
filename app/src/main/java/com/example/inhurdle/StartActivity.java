@@ -20,7 +20,7 @@ public class StartActivity extends AppCompatActivity {
                 StartActivity.this.startActivity(intent);
                 StartActivity.this.finish();
             }
-        }), 3000L);
+        }), 3000L); //3초간 splash 화면 띄우기
 
     }
 }

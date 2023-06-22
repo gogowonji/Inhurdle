@@ -43,16 +43,14 @@ import org.opencv.imgproc.Imgproc;
 
 public class CameraActivity extends AppCompatActivity implements CvCameraViewListener2 {
     private static final String TAG = "CameraActivity";
-    private static List<String> classNames;
-    private static List<Scalar> colors=new ArrayList<>();
-    private Net net;
-    private CameraBridgeViewBase mOpenCvCameraView;
-    private boolean permissionGranted = false;
+    private static List<String> classNames; //클래스명 받아오는 리스트
+    private static List<Scalar> colors=new ArrayList<>(); //박스 컬러 저장하는 리스트
 
-    BaseLoaderCallback mLoaderCallback;
-    private MediaPlayer mediaPlayer;
-
-    private static boolean[]canSpeak = new boolean[4]; //장애물을 중복 없이 음성 안내 하기 위한 배열
+    private Net net; //YOLOv4 모델 받아올 변수
+    private CameraBridgeViewBase mOpenCvCameraView; //카메라 연결 변수
+    BaseLoaderCallback mLoaderCallback; //카메라 연결 확인 콜백 변수
+    private MediaPlayer mediaPlayer; //음성 출력 변수
+    private static boolean[]canSpeak = new boolean[4]; //한 프레임의 장애물 중복 없이 음성 안내 하기 위한 배열
 
 
     @Override
@@ -60,6 +58,7 @@ public class CameraActivity extends AppCompatActivity implements CvCameraViewLis
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_camera);
 
+        //카메라 연결하기
         mOpenCvCameraView = findViewById(R.id.CameraView);
         mOpenCvCameraView.setCameraIndex(CameraBridgeViewBase.CAMERA_ID_BACK);
         mOpenCvCameraView.setVisibility(CameraBridgeViewBase.VISIBLE);
@@ -74,7 +73,6 @@ public class CameraActivity extends AppCompatActivity implements CvCameraViewLis
                     {
                         Log.i(TAG, "OpenCV loaded successfully");
                         mOpenCvCameraView.enableView();
-                        Log.i(TAG, "CameraView is enable");
                     } break;
                     default:
                     {
@@ -83,10 +81,11 @@ public class CameraActivity extends AppCompatActivity implements CvCameraViewLis
                 }
             }
         };
-        classNames = readLabels("obj.txt", this);
+        classNames = readLabels("obj.txt", this); //클래스명 가져오기
+        //bounding box 색상 정하기
         for(int i=0; i<classNames.size(); i++)
             colors.add(randomColor());
-        Log.i(TAG, "classNames colors");
+
     }
     @Override
     protected void onStart() {
@@ -98,13 +97,10 @@ public class CameraActivity extends AppCompatActivity implements CvCameraViewLis
                 ActivityCompat.requestPermissions(CameraActivity.this,
                         new String[]{android.Manifest.permission_group.CAMERA,
                                 Manifest.permission.WRITE_EXTERNAL_STORAGE}, 1);
-            } else {
-                Log.i(TAG, "Permission pass");
             }
         }
         if(_Permission){
-            onCameraPermissionGranted(); //카메라 접근 권한
-            Log.i(TAG, "Permission success");
+            onCameraPermissionGranted(); //카메라 접근 권한 확인
         }
     }
 
@@ -143,18 +139,15 @@ public class CameraActivity extends AppCompatActivity implements CvCameraViewLis
 
     @Override
     public void onCameraViewStarted(int width, int height) {
-        Log.d(TAG, "onCameraViewStarted");
         String modelConfiguration = getAssetsFile("yolov4-custom.cfg", this);
         String modelWeights = getAssetsFile("yolov4-custom_best.weights", this);
         net = Dnn.readNetFromDarknet(modelConfiguration, modelWeights); //yolo 모델 로딩
-        Log.i(TAG, "Dnn.readNetFromDarknet");
     }
 
 
 
     @Override
     public void onCameraViewStopped() {
-        Log.i(TAG, "onCameraViewStopped");
     }
 
 
@@ -163,37 +156,34 @@ public class CameraActivity extends AppCompatActivity implements CvCameraViewLis
     public Mat onCameraFrame(CvCameraViewFrame inputFrame) {
         //가장 중요한 함수
 
-        Log.d(TAG, "onCameraFrame");
         Mat frame = inputFrame.rgba();
         Imgproc.cvtColor(frame, frame, Imgproc.COLOR_RGBA2RGB); //이미지 프로세싱
-        Log.d(TAG, "Imgproc");
         Size frame_size = new Size(256, 256);
         Scalar mean = new Scalar(127.5);
 
-        Mat blob = Dnn.blobFromImage(frame, 1.0 / 255.0, frame_size, mean, true, false);
         //뉴런 네트워크에 이미지 넣기
+        Mat blob = Dnn.blobFromImage(frame, 1.0 / 255.0, frame_size, mean, true, false);
         net.setInput(blob);
-        Log.d(TAG, "Dnn.blobFromImage");
 
 
         List<Mat> result = new ArrayList<>(); //yolov4 레이어
         List<String> outBlobNames = net.getUnconnectedOutLayersNames(); //yolov4 레이어 이름
-        net.forward(result, outBlobNames); //순전파 진행 - onCameraViewStarted()에서 net으로 이미 받아옴
-        Log.d(TAG, "forward");
+        net.forward(result, outBlobNames); //순전파 진행 및 추론 - onCameraViewStarted()에서 net으로 이미 받아옴
 
         float confThreshold = 0.3f; //0.3 이상의 확률만 출력
 
         Arrays.fill(canSpeak,false); //Bounding Box 출력 이전, 클래스 안내 위한 배열 false로 초기화
 
-
         //Bounding Box 출력
-        for (int i = 0; i < result.size(); ++i) {
+        for (int i = 0; i < result.size(); ++i) { //레이어 갯수만큼 for문 돌기
 
             Mat level = result.get(i);
+
             for (int j = 0; j < level.rows(); ++j) {
                 Mat row = level.row(j);
-                Mat scores = row.colRange(5, level.cols());
-                Core.MinMaxLocResult mm = Core.minMaxLoc(scores);
+                Mat scores = row.colRange(5, level.cols()); //레이어 일부열 추출
+                // scores : 각 class 에 대한 probability
+                Core.MinMaxLocResult mm = Core.minMaxLoc(scores); //scores의 최소 최대 위치 찾기
                 float confidence = (float) mm.maxVal; //객체 감지 퍼센트
                 Point classIdPoint = mm.maxLoc; //여러개의 클래스들 중에 가장 정확도가 높은 클래스 찾기
 
@@ -205,34 +195,26 @@ public class CameraActivity extends AppCompatActivity implements CvCameraViewLis
                     int width = (int) (row.get(0, 2)[0] * frame.cols()); //box width
                     int height = (int) (row.get(0, 3)[0] * frame.rows());//box height
 
-                    Log.i(TAG, "frame.cols() :" + frame.cols());
-                    Log.i(TAG, "frame.rows() :" + frame.rows());
-                    Log.i(TAG, "width :" + width);
-                    Log.i(TAG, "height :" + height);
+                    int left = (int)(centerX - width * 0.5); //bounding box의 좌측상단 x좌표
+                    int top = (int)(centerY - height * 0.5); //bounding box의 좌측상단 y좌표
+                    int right = (int)(centerX + width * 0.5); //bounding box의 우측하단 x좌표
+                    int bottom = (int)(centerY + height * 0.5); //bounding box의 우측하단 y좌표
 
-                    int left = (int)(centerX - width * 0.5);
-                    int top = (int)(centerY - height * 0.5);
-                    int right = (int)(centerX + width * 0.5);
-                    int bottom = (int)(centerY + height * 0.5);
+                    Point left_top = new Point(left, top); //bounding box의 좌측상단 좌표
+                    Point right_bottom = new Point(right, bottom); //bounding box의 우측하단 좌표
 
-
-                    Point left_top = new Point(left, top);
-                    Point right_bottom=new Point(right, bottom);
-
-                    Point label_left_top = new Point(left, top-5);
+                    Point label_left_top = new Point(left, top-5); //라벨 좌표
                     DecimalFormat df = new DecimalFormat("#.##"); //클래스 확률 포맷
 
                     int class_id = (int) classIdPoint.x; //클래스명
                     String label= classNames.get(class_id) + ": " + df.format(confidence); //클래스명 + 클래스 확률
                     Scalar color= colors.get(class_id); //클래스별 컬러
 
+                    Imgproc.rectangle(frame, left_top, right_bottom, color, 3, 2); //bounding box 그리기
+                    Imgproc.putText(frame, label, label_left_top, Imgproc.FONT_HERSHEY_SIMPLEX, 1, new Scalar(0, 0, 0), 4); //글자 그림자 넣어 주기
+                    Imgproc.putText(frame, label, label_left_top, Imgproc.FONT_HERSHEY_SIMPLEX, 1, new Scalar(255, 255, 255), 2); //클래스명, 확률 출력
 
-                    Imgproc.rectangle(frame, left_top, right_bottom, color, 3, 2);
-                    Imgproc.putText(frame, label, label_left_top, Imgproc.FONT_HERSHEY_SIMPLEX, 1, new Scalar(0, 0, 0), 4); //글자 그림자 넣어 주려고
-                    Imgproc.putText(frame, label, label_left_top, Imgproc.FONT_HERSHEY_SIMPLEX, 1, new Scalar(255, 255, 255), 2);
-
-                    Log.i(TAG, "label - " + label);
-                    canSpeak[class_id] = true;
+                    canSpeak[class_id] = true;  //음성 안내 위해 해당 클래스 인덱스 true로 만들어주기
 
 
                 }
@@ -242,7 +224,6 @@ public class CameraActivity extends AppCompatActivity implements CvCameraViewLis
         }
 
         speakClasses(canSpeak); //음성 안내
-        Log.i(TAG, "------------------one frame------------------");
         return frame;
     }
 
@@ -251,28 +232,24 @@ public class CameraActivity extends AppCompatActivity implements CvCameraViewLis
         try {
             if (bool[0]) { //obj.txt의 클래스명 순서와 동일 (0:bollard 1:pole 2:person 3:etc)
                 mediaPlayer = MediaPlayer.create(CameraActivity.this, R.raw.bollard);
-                mediaPlayer.start();
-                Log.i(TAG, "bollard");
+                mediaPlayer.start(); //장애물 안내 음성 출력
                 Thread.sleep(3000); //음성 겹치지 않게 3초 기다리기
             }
             if (bool[1]) {
                 mediaPlayer = MediaPlayer.create(CameraActivity.this, R.raw.pole);
                 mediaPlayer.start();
-                Log.i(TAG, "pole");
                 Thread.sleep(3000);
 
             }
             if (bool[2]) {
                 mediaPlayer = MediaPlayer.create(CameraActivity.this, R.raw.person);
                 mediaPlayer.start();
-                Log.i(TAG, "person");
                 Thread.sleep(3000);
 
             }
             if(bool[3]){
                 mediaPlayer = MediaPlayer.create(CameraActivity.this, R.raw.etc);
                 mediaPlayer.start();
-                Log.i(TAG, "etc");
                 Thread.sleep(3000);
             }
 
@@ -282,9 +259,9 @@ public class CameraActivity extends AppCompatActivity implements CvCameraViewLis
 
     }
 
-
+    //YOLOv4 모델 관련 파일 읽어오기
     private static String getAssetsFile(String file, Context context) {
-        Log.d(TAG, "getAssetsFile");
+
         AssetManager assetManager = context.getAssets();
         BufferedInputStream inputStream;
         try {
@@ -307,10 +284,9 @@ public class CameraActivity extends AppCompatActivity implements CvCameraViewLis
     }
 
 
-
+    //obj.txt에서 클래스명 가져오기
     private List<String> readLabels (String file, Context context)
     {
-        Log.d(TAG, "readLabels");
         AssetManager assetManager = context.getAssets();
         BufferedInputStream inputStream;
         List<String> labelsArray = new ArrayList<>();
