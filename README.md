@@ -19,15 +19,14 @@
 
 <br>
 
+## 📱Result
 ### :point_down: [시작, 사용방법 안내 화면] :point_down:
-  *클릭 후 영상 재생*
+  [클릭 시 영상 재생](https://drive.google.com/file/d/1SUB2-0UIwRi-XqH2eKPm1vpwLwTw6rIl/view?usp=sharing)
 
-[![Video Label](https://github.com/gogowonji/Inhurdle/assets/65698313/d350433c-7790-4164-ac19-4b3e2ea66432)](https://drive.google.com/file/d/1SUB2-0UIwRi-XqH2eKPm1vpwLwTw6rIl/view?usp=sharing)
 
 ### :point_down: [장애물 감지 및 안내 구현 화면] :point_down:
-  *클릭 후 영상 재생*
+  [클릭 시 영상 재생](https://drive.google.com/file/d/19Z0HrJm_VJDSX6g9kozOtMZ-SA1c9o-r/view?usp=sharing)
 
-[![Video Label](https://github.com/gogowonji/Inhurdle/assets/65698313/984753a3-cfa2-4b89-ae8d-df498980eacc)](https://drive.google.com/file/d/19Z0HrJm_VJDSX6g9kozOtMZ-SA1c9o-r/view?usp=sharing)
 
 
 <br>
