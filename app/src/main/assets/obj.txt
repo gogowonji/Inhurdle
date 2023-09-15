@@ -1,0 +1,7 @@
+bollard
+pole
+person
+etc
+kickboard
+bicycle
+car

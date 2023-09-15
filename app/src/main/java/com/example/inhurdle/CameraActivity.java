@@ -50,7 +50,7 @@ public class CameraActivity extends AppCompatActivity implements CvCameraViewLis
     private CameraBridgeViewBase mOpenCvCameraView; //카메라 연결 변수
     BaseLoaderCallback mLoaderCallback; //카메라 연결 확인 콜백 변수
     private MediaPlayer mediaPlayer; //음성 출력 변수
-    private static boolean[]canSpeak = new boolean[4]; //한 프레임의 장애물 중복 없이 음성 안내 하기 위한 배열
+    private static boolean[]canSpeak = new boolean[7]; //한 프레임의 장애물 중복 없이 음성 안내 하기 위한 배열
 
 
     @Override
@@ -139,9 +139,10 @@ public class CameraActivity extends AppCompatActivity implements CvCameraViewLis
 
     @Override
     public void onCameraViewStarted(int width, int height) {
-        String modelConfiguration = getAssetsFile("yolov4-custom.cfg", this);
-        String modelWeights = getAssetsFile("yolov4-custom_best.weights", this);
+        String modelConfiguration = getAssetsFile("yolov4-tiny-custom.cfg", this);
+        String modelWeights = getAssetsFile("yolov4-tiny-custom_best.weights", this);
         net = Dnn.readNetFromDarknet(modelConfiguration, modelWeights); //yolo 모델 로딩
+        Log.i(TAG, "모델 로딩");
     }
 
 
@@ -158,17 +159,19 @@ public class CameraActivity extends AppCompatActivity implements CvCameraViewLis
 
         Mat frame = inputFrame.rgba();
         Imgproc.cvtColor(frame, frame, Imgproc.COLOR_RGBA2RGB); //이미지 프로세싱
-        Size frame_size = new Size(256, 256);
+        Size frame_size = new Size(416, 416);
         Scalar mean = new Scalar(127.5);
 
         //뉴런 네트워크에 이미지 넣기
-        Mat blob = Dnn.blobFromImage(frame, 1.0 / 255.0, frame_size, mean, true, false);
+        Mat blob = Dnn.blobFromImage(frame, 1.0 / 255.0, frame_size, mean, false, false); //swapRB 변경
+        //Mat blob = Dnn.blobFromImage(frame, 1.0 / 255.0, new Size(416, 416), new Scalar(0, 0, 0),false, false);
+
         net.setInput(blob);
 
-
-        List<Mat> result = new ArrayList<>(); //yolov4 레이어
-        List<String> outBlobNames = net.getUnconnectedOutLayersNames(); //yolov4 레이어 이름
+        List<Mat> result = new ArrayList<>(); //yolo 레이어
+        List<String> outBlobNames = net.getUnconnectedOutLayersNames(); //yolo 레이어 이름
         net.forward(result, outBlobNames); //순전파 진행 및 추론 - onCameraViewStarted()에서 net으로 이미 받아옴
+        Log.i(TAG, "순전파 진행");
 
         float confThreshold = 0.3f; //0.3 이상의 확률만 출력
 
@@ -178,18 +181,18 @@ public class CameraActivity extends AppCompatActivity implements CvCameraViewLis
         for (int i = 0; i < result.size(); ++i) { //레이어 갯수만큼 for문 돌기
 
             Mat level = result.get(i);
-
+            Log.i(TAG, "포문 진입1");
             for (int j = 0; j < level.rows(); ++j) {
                 Mat row = level.row(j);
-                Mat scores = row.colRange(5, level.cols()); //레이어 일부열 추출
+                Mat scores = row.colRange(5, level.cols()); //레이어 일부열 추출 yolov4-tiny수정
                 // scores : 각 class 에 대한 probability
                 Core.MinMaxLocResult mm = Core.minMaxLoc(scores); //scores의 최소 최대 위치 찾기
                 float confidence = (float) mm.maxVal; //객체 감지 퍼센트
                 Point classIdPoint = mm.maxLoc; //여러개의 클래스들 중에 가장 정확도가 높은 클래스 찾기
-
+                Log.i(TAG, "포문 진입2");
 
                 if (confidence > confThreshold) { //threshold보다 높게 감지된 객체만 표시하기
-
+                    Log.i(TAG, "바운딩 박스 진입 1");
                     int centerX = (int) (row.get(0, 0)[0] * frame.cols()); //bounding box 중앙 x좌표
                     int centerY = (int) (row.get(0, 1)[0] * frame.rows()); //box 중앙 y좌표
                     int width = (int) (row.get(0, 2)[0] * frame.cols()); //box width
@@ -215,6 +218,8 @@ public class CameraActivity extends AppCompatActivity implements CvCameraViewLis
                     Imgproc.putText(frame, label, label_left_top, Imgproc.FONT_HERSHEY_SIMPLEX, 1, new Scalar(255, 255, 255), 2); //클래스명, 확률 출력
 
                     canSpeak[class_id] = true;  //음성 안내 위해 해당 클래스 인덱스 true로 만들어주기
+
+                    Log.i(TAG, "바운딩 박스 끝");
 
 
                 }
@@ -249,6 +254,24 @@ public class CameraActivity extends AppCompatActivity implements CvCameraViewLis
             }
             if(bool[3]){
                 mediaPlayer = MediaPlayer.create(CameraActivity.this, R.raw.etc);
+                mediaPlayer.start();
+                Thread.sleep(3000);
+            }
+
+            if(bool[4]){
+                mediaPlayer = MediaPlayer.create(CameraActivity.this, R.raw.kickboard);
+                mediaPlayer.start();
+                Thread.sleep(3000);
+            }
+
+            if(bool[5]){
+                mediaPlayer = MediaPlayer.create(CameraActivity.this, R.raw.bicycle);
+                mediaPlayer.start();
+                Thread.sleep(3000);
+            }
+
+            if(bool[6]){
+                mediaPlayer = MediaPlayer.create(CameraActivity.this, R.raw.car);
                 mediaPlayer.start();
                 Thread.sleep(3000);
             }

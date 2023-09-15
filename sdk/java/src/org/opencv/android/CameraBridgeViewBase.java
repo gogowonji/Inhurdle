@@ -11,6 +11,7 @@ import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.Context;
 import android.content.DialogInterface;
+import android.content.res.Resources;
 import android.content.res.TypedArray;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
@@ -28,6 +29,7 @@ import android.view.SurfaceView;
  * frame to the screen.
  * The clients shall implement CvCameraViewListener.
  */
+
 public abstract class CameraBridgeViewBase extends SurfaceView implements SurfaceHolder.Callback {
 
     private static final String TAG = "CameraBridge";
@@ -57,6 +59,52 @@ public abstract class CameraBridgeViewBase extends SurfaceView implements Surfac
     public static final int CAMERA_ID_FRONT = 98;
     public static final int RGBA = 1;
     public static final int GRAY = 2;
+
+//    private final Matrix mMatrix = new Matrix();
+//    private void updateMatrix(){
+//
+//        float mw = this.getWidth();
+//        float mh = this.getHeight();
+//
+//        float hw = this.getWidth() / 2.0f;
+//        float hh = this.getHeight() / 2.0f;
+//
+//        float cw  = (float) Resources.getSystem().getDisplayMetrics().widthPixels; //Make sure to import Resources package
+//        float ch  = (float) Resources.getSystem().getDisplayMetrics().heightPixels;
+//
+//        float scale = cw / (float)mh;
+//        float scale2 = ch / (float)mw;
+//        if(scale2 > scale){
+//            scale = scale2;
+//        }
+//
+//        boolean isFrontCamera = mCameraIndex == CAMERA_ID_FRONT;
+//
+//        mMatrix.reset();
+//        if (isFrontCamera) {
+//            mMatrix.preScale(-1, 1, hw, hh); //MH - this will mirror the camera
+//        }
+//        mMatrix.preTranslate(hw, hh);
+//        if (isFrontCamera){
+//            mMatrix.preRotate(270);
+//        } else {
+//            mMatrix.preRotate(90);
+//        }
+//        mMatrix.preTranslate(-hw, -hh);
+//        mMatrix.preScale(scale,scale,hw,hh);
+//    };
+//
+//    @Override
+//    public void layout(int l, int t, int r, int b) {
+//        super.layout(l, t, r, b);
+//        updateMatrix();
+//    }
+//
+//    @Override
+//    protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
+//        super.onMeasure(widthMeasureSpec, heightMeasureSpec);
+//        updateMatrix();
+//    }
 
     public CameraBridgeViewBase(Context context, int cameraId) {
         super(context);
@@ -402,62 +450,6 @@ public abstract class CameraBridgeViewBase extends SurfaceView implements Surfac
      * then displayed on the screen.
      * @param frame - the current frame to be delivered
      */
-//    protected void deliverAndDrawFrame(CvCameraViewFrame frame) {
-//        Mat modified;
-//
-//        if (mListener != null) {
-//            modified = mListener.onCameraFrame(frame);
-//        } else {
-//            modified = frame.rgba();
-//        }
-//
-//        boolean bmpValid = true;
-//        if (modified != null) {
-//            try {
-//                Utils.matToBitmap(modified, mCacheBitmap);
-//            } catch(Exception e) {
-//                Log.e(TAG, "Mat type: " + modified);
-//                Log.e(TAG, "Bitmap type: " + mCacheBitmap.getWidth() + "*" + mCacheBitmap.getHeight());
-//                Log.e(TAG, "Utils.matToBitmap() throws an exception: " + e.getMessage());
-//                bmpValid = false;
-//            }
-//        }
-//
-//        if (bmpValid && mCacheBitmap != null) {
-//            Canvas canvas = getHolder().lockCanvas();
-//            if (canvas != null) {
-//                canvas.drawColor(0, android.graphics.PorterDuff.Mode.CLEAR);
-//                if (BuildConfig.DEBUG) {
-//                    Log.d(TAG, "mStretch value: " + mScale);
-//                }
-//
-//                // Start of the fix
-//                if (mScale != 0) {
-//                    canvas.drawBitmap(mCacheBitmap, new Rect(0,0,mCacheBitmap.getWidth(), mCacheBitmap.getHeight()),
-//                         new Rect((int)((canvas.getWidth() - mScale*mCacheBitmap.getWidth()) / 2),
-//                         (int)((canvas.getHeight() - mScale*mCacheBitmap.getHeight()) / 2),
-//                         (int)((canvas.getWidth() - mScale*mCacheBitmap.getWidth()) / 2 + mScale*mCacheBitmap.getWidth()),
-//                         (int)((canvas.getHeight() - mScale*mCacheBitmap.getHeight()) / 2 + mScale*mCacheBitmap.getHeight())), null);
-//                } else {
-//                     canvas.drawBitmap(mCacheBitmap, new Rect(0,0,mCacheBitmap.getWidth(), mCacheBitmap.getHeight()),
-//                         new Rect((canvas.getWidth() - mCacheBitmap.getWidth()) / 2,
-//                         (canvas.getHeight() - mCacheBitmap.getHeight()) / 2,
-//                         (canvas.getWidth() - mCacheBitmap.getWidth()) / 2 + mCacheBitmap.getWidth(),
-//                         (canvas.getHeight() - mCacheBitmap.getHeight()) / 2 + mCacheBitmap.getHeight()), null);
-//                }
-//
-//
-//                // Back to original OpenCV code
-//                if (mFpsMeter != null) {
-//                    mFpsMeter.measure();
-//                    mFpsMeter.draw(canvas, 20, 30);
-//                }
-//
-//                getHolder().unlockCanvasAndPost(canvas);
-//            }
-//        }
-//
-//    }
     protected void deliverAndDrawFrame(CvCameraViewFrame frame) {
         Mat modified;
 
@@ -488,12 +480,20 @@ public abstract class CameraBridgeViewBase extends SurfaceView implements Surfac
                 }
 
                 // Start of the fix
-                Matrix matrix = new Matrix();
-                matrix.preTranslate( ( canvas.getWidth() - mCacheBitmap.getWidth() ) / 2f, ( canvas.getHeight() - mCacheBitmap.getHeight() ) / 2f );
-                matrix.postRotate( 90f, ( canvas.getWidth()) / 2f, canvas.getHeight() / 2f );
-                float scale = (float) canvas.getWidth() / (float) mCacheBitmap.getHeight();
-                matrix.postScale(scale, scale, canvas.getWidth() / 2f , canvas.getHeight() / 2f );
-                canvas.drawBitmap( mCacheBitmap, matrix, null );
+                if (mScale != 0) {
+                    canvas.drawBitmap(mCacheBitmap, new Rect(0,0,mCacheBitmap.getWidth(), mCacheBitmap.getHeight()),
+                         new Rect((int)((canvas.getWidth() - mScale*mCacheBitmap.getWidth()) / 2),
+                         (int)((canvas.getHeight() - mScale*mCacheBitmap.getHeight()) / 2),
+                         (int)((canvas.getWidth() - mScale*mCacheBitmap.getWidth()) / 2 + mScale*mCacheBitmap.getWidth()),
+                         (int)((canvas.getHeight() - mScale*mCacheBitmap.getHeight()) / 2 + mScale*mCacheBitmap.getHeight())), null);
+                } else {
+                     canvas.drawBitmap(mCacheBitmap, new Rect(0,0,mCacheBitmap.getWidth(), mCacheBitmap.getHeight()),
+                         new Rect((canvas.getWidth() - mCacheBitmap.getWidth()) / 2,
+                         (canvas.getHeight() - mCacheBitmap.getHeight()) / 2,
+                         (canvas.getWidth() - mCacheBitmap.getWidth()) / 2 + mCacheBitmap.getWidth(),
+                         (canvas.getHeight() - mCacheBitmap.getHeight()) / 2 + mCacheBitmap.getHeight()), null);
+                }
+
 
                 // Back to original OpenCV code
                 if (mFpsMeter != null) {
@@ -506,6 +506,59 @@ public abstract class CameraBridgeViewBase extends SurfaceView implements Surfac
         }
 
     }
+
+//    protected void deliverAndDrawFrame(CvCameraViewFrame frame) {
+//        Mat modified;
+//        if (mListener != null) {
+//            modified = mListener.onCameraFrame(frame);
+//        } else {
+//            modified = frame.rgba();
+//        }
+//
+//        boolean bmpValid = true;
+//        if (modified != null) {
+//            try {
+//                Utils.matToBitmap(modified, mCacheBitmap);
+//            } catch(Exception e) {
+//                Log.e(TAG, "Mat type: " + modified);
+//                Log.e(TAG, "Bitmap type: " + mCacheBitmap.getWidth() + "*" + mCacheBitmap.getHeight());
+//                Log.e(TAG, "Utils.matToBitmap() throws an exception: " + e.getMessage());
+//                bmpValid = false;
+//            }
+//        }
+//
+//        if (bmpValid && mCacheBitmap != null) {
+//            Canvas canvas = getHolder().lockCanvas();
+//            if (canvas != null) {
+//                canvas.drawColor(0, android.graphics.PorterDuff.Mode.CLEAR);
+//                int saveCount = canvas.save();
+//                canvas.setMatrix(mMatrix);
+//
+//                if (mScale != 0) {
+//                    canvas.drawBitmap(mCacheBitmap, new Rect(0,0,mCacheBitmap.getWidth(), mCacheBitmap.getHeight()),
+//                            new Rect((int)((canvas.getWidth() - mScale*mCacheBitmap.getWidth()) / 2),
+//                                    (int)((canvas.getHeight() - mScale*mCacheBitmap.getHeight()) / 2),
+//                                    (int)((canvas.getWidth() - mScale*mCacheBitmap.getWidth()) / 2 + mScale*mCacheBitmap.getWidth()),
+//                                    (int)((canvas.getHeight() - mScale*mCacheBitmap.getHeight()) / 2 + mScale*mCacheBitmap.getHeight())), null);
+//                } else {
+//                    canvas.drawBitmap(mCacheBitmap, new Rect(0,0,mCacheBitmap.getWidth(), mCacheBitmap.getHeight()),
+//                            new Rect((canvas.getWidth() - mCacheBitmap.getWidth()) / 2,
+//                                    (canvas.getHeight() - mCacheBitmap.getHeight()) / 2,
+//                                    (canvas.getWidth() - mCacheBitmap.getWidth()) / 2 + mCacheBitmap.getWidth(),
+//                                    (canvas.getHeight() - mCacheBitmap.getHeight()) / 2 + mCacheBitmap.getHeight()), null);
+//                }
+//
+//                //Restore canvas after draw bitmap
+//                canvas.restoreToCount(saveCount);
+//
+//                if (mFpsMeter != null) {
+//                    mFpsMeter.measure();
+//                    mFpsMeter.draw(canvas, 20, 30);
+//                }
+//                getHolder().unlockCanvasAndPost(canvas);
+//            }
+//        }
+//    }
 
     /**
      * This method is invoked shall perform concrete operation to initialize the camera.
