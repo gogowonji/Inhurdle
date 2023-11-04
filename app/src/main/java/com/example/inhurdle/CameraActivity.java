@@ -1,8 +1,12 @@
 package com.example.inhurdle;
 
 
+import static android.Manifest.permission_group.CAMERA;
+
 import android.Manifest;
+import android.annotation.TargetApi;
 import android.content.Context;
+import android.content.DialogInterface;
 import android.content.pm.PackageManager;
 import android.content.res.AssetManager;
 import android.media.MediaPlayer;
@@ -10,6 +14,8 @@ import android.os.Build;
 import android.os.Bundle;
 
 import android.util.Log;
+
+import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
@@ -50,7 +56,9 @@ public class CameraActivity extends AppCompatActivity implements CvCameraViewLis
     private CameraBridgeViewBase mOpenCvCameraView; //카메라 연결 변수
     BaseLoaderCallback mLoaderCallback; //카메라 연결 확인 콜백 변수
     private MediaPlayer mediaPlayer; //음성 출력 변수
-    private static boolean[]canSpeak = new boolean[7]; //한 프레임의 장애물 중복 없이 음성 안내 하기 위한 배열
+    private static int[]canSpeak = new int[7]; //한 프레임의 장애물 중복 없이 음성 안내 하기 위한 배열
+
+    private static int[]center = new int[7];
 
 
     @Override
@@ -91,16 +99,31 @@ public class CameraActivity extends AppCompatActivity implements CvCameraViewLis
     protected void onStart() {
         super.onStart();
         boolean _Permission = true; //변수 추가
+        //권한 설정
+        if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.M){//최소 버전보다 버전이 높은지 확인
+            if(checkSelfPermission(Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
+                requestPermissions(new String[]{Manifest.permission.CAMERA}, 200);
+                _Permission = false;
+                Log.d(TAG, "Camera permission false");
+            }
+            if(_Permission){
+                onCameraPermissionGranted(); //카메라 접근 권한 확인
+                Log.d(TAG, "Camera permissionGranted()");
+            }
+        }
+        //기존 코드
         if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.M){ //최소 버전보다 버전이 높은지 확인
             if(ContextCompat.checkSelfPermission(CameraActivity.this,
                     android.Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
                 ActivityCompat.requestPermissions(CameraActivity.this,
                         new String[]{android.Manifest.permission_group.CAMERA,
                                 Manifest.permission.WRITE_EXTERNAL_STORAGE}, 1);
+                Log.d(TAG, "External Storage permission");
             }
         }
         if(_Permission){
             onCameraPermissionGranted(); //카메라 접근 권한 확인
+            Log.d(TAG, "Camera permissionGranted()");
         }
     }
 
@@ -112,6 +135,7 @@ public class CameraActivity extends AppCompatActivity implements CvCameraViewLis
         }
         for (CameraBridgeViewBase cameraBridgeViewBase: cameraViews) {
             if (cameraBridgeViewBase != null) {
+                Log.d(TAG, "setCameraPermissionGreanted");
                 cameraBridgeViewBase.setCameraPermissionGranted(); //없으면 카메라 화면이 안 켜짐
             }
         }
@@ -121,7 +145,6 @@ public class CameraActivity extends AppCompatActivity implements CvCameraViewLis
     protected List<? extends CameraBridgeViewBase> getCameraViewList() {
         return Collections.singletonList(mOpenCvCameraView);
     }
-
 
     @Override
     public void onResume() {
@@ -175,7 +198,9 @@ public class CameraActivity extends AppCompatActivity implements CvCameraViewLis
 
         float confThreshold = 0.3f; //0.3 이상의 확률만 출력
 
-        Arrays.fill(canSpeak,false); //Bounding Box 출력 이전, 클래스 안내 위한 배열 false로 초기화
+       Arrays.fill(canSpeak,0); //Bounding Box 출력 이전, 클래스 안내 위한 배열 false로 초기화
+
+
 
         //Bounding Box 출력
         for (int i = 0; i < result.size(); ++i) { //레이어 갯수만큼 for문 돌기
@@ -196,7 +221,7 @@ public class CameraActivity extends AppCompatActivity implements CvCameraViewLis
                     int centerX = (int) (row.get(0, 0)[0] * frame.cols()); //bounding box 중앙 x좌표
                     int centerY = (int) (row.get(0, 1)[0] * frame.rows()); //box 중앙 y좌표
                     int width = (int) (row.get(0, 2)[0] * frame.cols()); //box width
-                    int height = (int) (row.get(0, 3)[0] * frame.rows());//box height
+                    int height = (int) (row.get(0, 3)[0] * frame.rows()); //box height
 
                     int left = (int)(centerX - width * 0.5); //bounding box의 좌측상단 x좌표
                     int top = (int)(centerY - height * 0.5); //bounding box의 좌측상단 y좌표
@@ -217,8 +242,9 @@ public class CameraActivity extends AppCompatActivity implements CvCameraViewLis
                     Imgproc.putText(frame, label, label_left_top, Imgproc.FONT_HERSHEY_SIMPLEX, 1, new Scalar(0, 0, 0), 4); //글자 그림자 넣어 주기
                     Imgproc.putText(frame, label, label_left_top, Imgproc.FONT_HERSHEY_SIMPLEX, 1, new Scalar(255, 255, 255), 2); //클래스명, 확률 출력
 
-                    canSpeak[class_id] = true;  //음성 안내 위해 해당 클래스 인덱스 true로 만들어주기
-
+                    canSpeak[class_id]++;  //음성 안내 위해 해당 클래스 인덱스 개수 받아오기
+                    center[class_id] = centerX;
+                    Log.i(TAG, "centerX:" + centerX);
                     Log.i(TAG, "바운딩 박스 끝");
 
 
@@ -227,53 +253,195 @@ public class CameraActivity extends AppCompatActivity implements CvCameraViewLis
             }
 
         }
+        Log.i(TAG, "frame.cols() : " + frame.cols());
+        naviFunc(frame.cols(), canSpeak, center);
 
-        speakClasses(canSpeak); //음성 안내
+
+        //speakClasses(canSpeak); //음성 안내
         return frame;
     }
 
-    public void speakClasses(boolean bool[]) {
+
+    public void naviFunc(int f, int classes[], int midX[]){
+        for(int i = 0; i < 7; i++){
+            if(classes[i] == 1){
+                int where = midX[i];
+                midX[i] = location(f, where); //좌측,중앙,우측
+                Log.i(TAG, "가로 크기 : " + f);
+                Log.i(TAG, "위치 (1:좌측, 2:중앙, 3:우측) : " + midX[i]);
+                speakClasses(i, midX);
+
+            }
+            else if(classes[i] > 1){
+                midX[i] = 0; //전방
+                Log.i(TAG, "위치 : 0");
+                speakClasses(i,midX);
+            }
+
+        }
+
+    }
+
+    public int location(int f, int midX){
+
+        int left = f/3;
+        int right = f/3*2;
+
+        if(midX < left){ //좌측
+            return 1;
+
+        }else if(left <= midX & midX < right){ //중앙
+            return 2;
+
+        }else{ //우측
+            return 3;
+        }
+
+    }
+
+    public void speakClasses(int classes, int midX[]) {
 
         try {
-            if (bool[0]) { //obj.txt의 클래스명 순서와 동일 (0:bollard 1:pole 2:person 3:etc)
-                mediaPlayer = MediaPlayer.create(CameraActivity.this, R.raw.bollard);
-                mediaPlayer.start(); //장애물 안내 음성 출력
-                Thread.sleep(3000); //음성 겹치지 않게 3초 기다리기
-            }
-            if (bool[1]) {
-                mediaPlayer = MediaPlayer.create(CameraActivity.this, R.raw.pole);
-                mediaPlayer.start();
-                Thread.sleep(3000);
+            if (classes == 0) { //obj.txt의 클래스명 순서와 동일 (0:bollard 1:pole 2:person ...)
+                if(midX[0] == 0){
+                    mediaPlayer = MediaPlayer.create(CameraActivity.this, R.raw.bollard);
+                    mediaPlayer.start(); //장애물 안내 음성 출력
+                    Thread.sleep(3000); //음성 겹치지 않게 3초 기다리기
+                }else if(midX[0] == 1){
+                    mediaPlayer = MediaPlayer.create(CameraActivity.this, R.raw.bollard1);
+                    mediaPlayer.start();
+                    Thread.sleep(3000);
+                }else if(midX[0] == 2){
+
+                }else{
+                    mediaPlayer = MediaPlayer.create(CameraActivity.this, R.raw.bollard3);
+                    mediaPlayer.start();
+                    Thread.sleep(3000);
+                }
 
             }
-            if (bool[2]) {
-                mediaPlayer = MediaPlayer.create(CameraActivity.this, R.raw.person);
-                mediaPlayer.start();
-                Thread.sleep(3000);
+            if (classes == 1) {
+                if(midX[1] == 0){
+                    mediaPlayer = MediaPlayer.create(CameraActivity.this, R.raw.pole);
+                    mediaPlayer.start();
+                    Thread.sleep(3000);
+                }else if(midX[1] == 1){
+                    mediaPlayer = MediaPlayer.create(CameraActivity.this, R.raw.pole1);
+                    mediaPlayer.start();
+                    Thread.sleep(3000);
+                }else if(midX[1] == 2){
+
+                }else{
+                    mediaPlayer = MediaPlayer.create(CameraActivity.this, R.raw.pole3);
+                    mediaPlayer.start();
+                    Thread.sleep(3000);
+                }
+
 
             }
-            if(bool[3]){
-                mediaPlayer = MediaPlayer.create(CameraActivity.this, R.raw.etc);
-                mediaPlayer.start();
-                Thread.sleep(3000);
+            if (classes == 2) {
+                if(midX[2] == 0){
+                    mediaPlayer = MediaPlayer.create(CameraActivity.this, R.raw.person);
+                    mediaPlayer.start();
+                    Thread.sleep(3000);
+                }else if(midX[2] == 1){
+                    mediaPlayer = MediaPlayer.create(CameraActivity.this, R.raw.person1);
+                    mediaPlayer.start();
+                    Thread.sleep(3000);
+                }else if(midX[2] == 2){
+                    mediaPlayer = MediaPlayer.create(CameraActivity.this, R.raw.person);
+                    mediaPlayer.start();
+                    Thread.sleep(3000);
+                }else{
+                    mediaPlayer = MediaPlayer.create(CameraActivity.this, R.raw.person3);
+                    mediaPlayer.start();
+                    Thread.sleep(3000);
+                }
+
+
+            }
+            if(classes == 3){
+                if(midX[3] == 0){
+                    mediaPlayer = MediaPlayer.create(CameraActivity.this, R.raw.etc);
+                    mediaPlayer.start();
+                    Thread.sleep(3000);
+                }else if(midX[3] == 1){
+                    mediaPlayer = MediaPlayer.create(CameraActivity.this, R.raw.etc1);
+                    mediaPlayer.start();
+                    Thread.sleep(3000);
+                }else if(midX[3] == 2){
+                    mediaPlayer = MediaPlayer.create(CameraActivity.this, R.raw.etc);
+                    mediaPlayer.start();
+                    Thread.sleep(3000);
+                }else{
+                    mediaPlayer = MediaPlayer.create(CameraActivity.this, R.raw.etc3);
+                    mediaPlayer.start();
+                    Thread.sleep(3000);
+                }
+
             }
 
-            if(bool[4]){
-                mediaPlayer = MediaPlayer.create(CameraActivity.this, R.raw.kickboard);
-                mediaPlayer.start();
-                Thread.sleep(3000);
+            if(classes == 4){
+                if(midX[4] == 0){
+                    mediaPlayer = MediaPlayer.create(CameraActivity.this, R.raw.kickboard);
+                    mediaPlayer.start();
+                    Thread.sleep(3000);
+                }else if(midX[4] == 1){
+                    mediaPlayer = MediaPlayer.create(CameraActivity.this, R.raw.kickboard1);
+                    mediaPlayer.start();
+                    Thread.sleep(3000);
+                }else if(midX[4] == 2){
+                    mediaPlayer = MediaPlayer.create(CameraActivity.this, R.raw.kickboard);
+                    mediaPlayer.start();
+                    Thread.sleep(3000);
+                }else{
+                    mediaPlayer = MediaPlayer.create(CameraActivity.this, R.raw.kickboard3);
+                    mediaPlayer.start();
+                    Thread.sleep(3000);
+                }
+
             }
 
-            if(bool[5]){
-                mediaPlayer = MediaPlayer.create(CameraActivity.this, R.raw.bicycle);
-                mediaPlayer.start();
-                Thread.sleep(3000);
+            if(classes == 5){
+                if(midX[5] == 0){
+                    mediaPlayer = MediaPlayer.create(CameraActivity.this, R.raw.bicycle);
+                    mediaPlayer.start();
+                    Thread.sleep(3000);
+                }else if(midX[5] == 1){
+                    mediaPlayer = MediaPlayer.create(CameraActivity.this, R.raw.bicycle1);
+                    mediaPlayer.start();
+                    Thread.sleep(3000);
+                }else if(midX[5] == 2){
+                    mediaPlayer = MediaPlayer.create(CameraActivity.this, R.raw.bicycle);
+                    mediaPlayer.start();
+                    Thread.sleep(3000);
+                }else{
+                    mediaPlayer = MediaPlayer.create(CameraActivity.this, R.raw.bicycle3);
+                    mediaPlayer.start();
+                    Thread.sleep(3000);
+                }
+
             }
 
-            if(bool[6]){
-                mediaPlayer = MediaPlayer.create(CameraActivity.this, R.raw.car);
-                mediaPlayer.start();
-                Thread.sleep(3000);
+            if(classes == 6){
+                if(midX[6] == 0){
+                    mediaPlayer = MediaPlayer.create(CameraActivity.this, R.raw.car);
+                    mediaPlayer.start();
+                    Thread.sleep(3000);
+                }else if(midX[6] == 1){
+                    mediaPlayer = MediaPlayer.create(CameraActivity.this, R.raw.car1);
+                    mediaPlayer.start();
+                    Thread.sleep(3000);
+                }else if(midX[6] == 2){
+                    mediaPlayer = MediaPlayer.create(CameraActivity.this, R.raw.car);
+                    mediaPlayer.start();
+                    Thread.sleep(3000);
+                }else{
+                    mediaPlayer = MediaPlayer.create(CameraActivity.this, R.raw.car3);
+                    mediaPlayer.start();
+                    Thread.sleep(3000);
+                }
+
             }
 
         } catch (InterruptedException e) {
