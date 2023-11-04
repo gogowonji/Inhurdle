@@ -20,12 +20,9 @@
 <br>
 
 ## 📱Result
-### :point_down: [시작, 사용방법 안내 화면] :point_down:
-  [클릭 시 영상 재생](https://drive.google.com/file/d/1SUB2-0UIwRi-XqH2eKPm1vpwLwTw6rIl/view?usp=sharing)
+### :point_down: [어플 시연 동영상] :point_down:
+  [클릭 시 영상 재생](https://youtu.be/ECuJ9XVvvvA?si=4HE9NuTc_Ru1jnVH)
 
-
-### :point_down: [장애물 감지 및 안내 구현 화면] :point_down:
-  [클릭 시 영상 재생](https://drive.google.com/file/d/19Z0HrJm_VJDSX6g9kozOtMZ-SA1c9o-r/view?usp=sharing)
 
 
 
