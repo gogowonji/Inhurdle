@@ -243,7 +243,7 @@ public class CameraActivity extends AppCompatActivity implements CvCameraViewLis
                     Imgproc.putText(frame, label, label_left_top, Imgproc.FONT_HERSHEY_SIMPLEX, 1, new Scalar(255, 255, 255), 2); //클래스명, 확률 출력
 
                     canSpeak[class_id]++;  //음성 안내 위해 해당 클래스 인덱스 개수 받아오기
-                    center[class_id] = centerX;
+                    center[class_id] = centerX; //bounding box 중앙 좌표 가져오기
                     Log.i(TAG, "centerX:" + centerX);
                     Log.i(TAG, "바운딩 박스 끝");
 
@@ -312,7 +312,9 @@ public class CameraActivity extends AppCompatActivity implements CvCameraViewLis
                     mediaPlayer.start();
                     Thread.sleep(3000);
                 }else if(midX[0] == 2){
-
+                    mediaPlayer = MediaPlayer.create(CameraActivity.this, R.raw.bollard2);
+                    mediaPlayer.start();
+                    Thread.sleep(3000);
                 }else{
                     mediaPlayer = MediaPlayer.create(CameraActivity.this, R.raw.bollard3);
                     mediaPlayer.start();
@@ -330,7 +332,9 @@ public class CameraActivity extends AppCompatActivity implements CvCameraViewLis
                     mediaPlayer.start();
                     Thread.sleep(3000);
                 }else if(midX[1] == 2){
-
+                    mediaPlayer = MediaPlayer.create(CameraActivity.this, R.raw.pole2);
+                    mediaPlayer.start();
+                    Thread.sleep(3000);
                 }else{
                     mediaPlayer = MediaPlayer.create(CameraActivity.this, R.raw.pole3);
                     mediaPlayer.start();
@@ -349,7 +353,7 @@ public class CameraActivity extends AppCompatActivity implements CvCameraViewLis
                     mediaPlayer.start();
                     Thread.sleep(3000);
                 }else if(midX[2] == 2){
-                    mediaPlayer = MediaPlayer.create(CameraActivity.this, R.raw.person);
+                    mediaPlayer = MediaPlayer.create(CameraActivity.this, R.raw.person2);
                     mediaPlayer.start();
                     Thread.sleep(3000);
                 }else{
@@ -370,7 +374,7 @@ public class CameraActivity extends AppCompatActivity implements CvCameraViewLis
                     mediaPlayer.start();
                     Thread.sleep(3000);
                 }else if(midX[3] == 2){
-                    mediaPlayer = MediaPlayer.create(CameraActivity.this, R.raw.etc);
+                    mediaPlayer = MediaPlayer.create(CameraActivity.this, R.raw.etc2);
                     mediaPlayer.start();
                     Thread.sleep(3000);
                 }else{
@@ -391,7 +395,7 @@ public class CameraActivity extends AppCompatActivity implements CvCameraViewLis
                     mediaPlayer.start();
                     Thread.sleep(3000);
                 }else if(midX[4] == 2){
-                    mediaPlayer = MediaPlayer.create(CameraActivity.this, R.raw.kickboard);
+                    mediaPlayer = MediaPlayer.create(CameraActivity.this, R.raw.kickboard2);
                     mediaPlayer.start();
                     Thread.sleep(3000);
                 }else{
@@ -412,7 +416,7 @@ public class CameraActivity extends AppCompatActivity implements CvCameraViewLis
                     mediaPlayer.start();
                     Thread.sleep(3000);
                 }else if(midX[5] == 2){
-                    mediaPlayer = MediaPlayer.create(CameraActivity.this, R.raw.bicycle);
+                    mediaPlayer = MediaPlayer.create(CameraActivity.this, R.raw.bicycle2);
                     mediaPlayer.start();
                     Thread.sleep(3000);
                 }else{
@@ -433,7 +437,7 @@ public class CameraActivity extends AppCompatActivity implements CvCameraViewLis
                     mediaPlayer.start();
                     Thread.sleep(3000);
                 }else if(midX[6] == 2){
-                    mediaPlayer = MediaPlayer.create(CameraActivity.this, R.raw.car);
+                    mediaPlayer = MediaPlayer.create(CameraActivity.this, R.raw.car2);
                     mediaPlayer.start();
                     Thread.sleep(3000);
                 }else{
