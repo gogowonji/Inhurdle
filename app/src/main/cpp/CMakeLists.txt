@@ -5,12 +5,11 @@
 
 cmake_minimum_required(VERSION 3.4.1)
 
-#set(pathPROJECT /Users/wonji/AndroidStudioProjects/Inhurdle) # 수정필요
-#set(pathOPENCV ${pathPROJECT}/sdk)
-
+###### 수정필요
 set(pathOPENCV /Users/wonji/OpenCV-android-sdk5/sdk)
 set(pathPROJECT /Users/wonji/Project/Inhurdle)
 set(pathLIBOPENCV_JAVA ${pathPROJECT}/app/src/main/jniLibs/${ANDROID_ABI}/libopencv_java4.so)
+######
 
 set(CMAKE_VERBOSE_MAKEFILE on)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=gnu++11")
