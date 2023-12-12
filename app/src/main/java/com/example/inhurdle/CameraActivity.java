@@ -59,10 +59,7 @@ public class CameraActivity extends AppCompatActivity implements CvCameraViewLis
     BaseLoaderCallback mLoaderCallback; //카메라 연결 확인 콜백 변수
     private MediaPlayer mediaPlayer; //음성 출력 변수
 
-
-    //private static int[]centerXlist = new int[7]; //구체적 위치 안내시 bounding box x좌표 저장 위한 배열
-    //private static int[]centerYlist = new int[7]; //구체적 위치 안내시 bounding box y좌표 저장 위한 배열
-
+    // 클래스별 장애물 인식시 갯수 파악과 좌표를 받아오는 리스트
     private static List<Integer> bollard = new ArrayList<>();
     private static List<Integer> pole = new ArrayList<>();
     private static List<Integer> person = new ArrayList<>();
@@ -197,8 +194,8 @@ public class CameraActivity extends AppCompatActivity implements CvCameraViewLis
         Scalar mean = new Scalar(127.5);
 
         //뉴런 네트워크에 이미지 넣기
-        Mat blob = Dnn.blobFromImage(frame, 1.0 / 255.0, frame_size, mean, false, false); //swapRB 변경
-        //Mat blob = Dnn.blobFromImage(frame, 1.0 / 255.0, new Size(416, 416), new Scalar(0, 0, 0),false, false);
+        Mat blob = Dnn.blobFromImage(frame, 1.0 / 255.0, frame_size, mean, false, false);
+
 
         net.setInput(blob);
 
@@ -253,28 +250,26 @@ public class CameraActivity extends AppCompatActivity implements CvCameraViewLis
                     Imgproc.putText(frame, label, label_left_top, Imgproc.FONT_HERSHEY_SIMPLEX, 1, new Scalar(0, 0, 0), 4); //글자 그림자 넣어 주기
                     Imgproc.putText(frame, label, label_left_top, Imgproc.FONT_HERSHEY_SIMPLEX, 1, new Scalar(255, 255, 255), 2); //클래스명, 확률 출력
 
+
                     canSpeak[class_id]++;  //음성 안내 위해 해당 클래스 인덱스 개수 받아오기
 
+                    //장애물 인식시 클래스별로 바운딩 박스의 중앙 좌표 리스트에 추가
                     if(class_id == 0){
-                        bollard.add(centerX);
+                        bollard.add(centerX); //볼라드
                     }else if(class_id == 1){
-                        pole.add(centerX);
+                        pole.add(centerX); //기둥
                     }else if(class_id == 2){
-                        person.add(centerX);
+                        person.add(centerX); //사람
                     }else if(class_id == 3){
-                        etc.add(centerX);
+                        etc.add(centerX); //기타 장애물
                     }else if(class_id == 4){
-                        kickboard.add(centerX);
+                        kickboard.add(centerX); //킥보드
                     }else if(class_id == 5){
-                        bicycle.add(centerX);
+                        bicycle.add(centerX); //자전거
                     }else{
-                        car.add(centerX);
+                        car.add(centerX); //자동차
                     }
 
-//                    centerXlist[class_id] = centerX; //bounding box 중앙 좌표 받아오기 -> 함수 호출시 가장 마지막 객체의 좌표 받아오게 됨
-//                    centerYlist[class_id] = centerY;
-//                    Log.i(TAG, "centerX:" + centerX);
-//                    Log.i(TAG, "centerY:" + centerY);
 
                     Log.i(TAG, "바운딩 박스 끝");
 
@@ -286,29 +281,32 @@ public class CameraActivity extends AppCompatActivity implements CvCameraViewLis
         }
         Log.i(TAG, "frame.cols() : " + frame.cols());
 
-        naviFunc(frame.size(), canSpeak); // frame의 가로 크기 받아오기, 인덱스별 개수
+        naviFunc(frame.size(), canSpeak); //frame의 가로 크기 받아오기, 인덱스별 개수 받아오기
 
         return frame;
     }
 
     public void naviFunc(Size f, int classes[]){
-        // 모든 리스트 좌표를 확인해야 함 -> 해당 클래스 좌표 대체하고 우선순위 써주기
+        //모든 리스트 좌표를 확인 -> 우선순위 배열로 개수 세기
 
-        int first[] = new int[7];
-        int second[] = new int[7];
-        int third[] = new int[7];
+        //음성안내를 위한 우선순위 배열
+        int first[] = new int[7]; //첫번째 우선순위
+        int second[] = new int[7]; //두번째 우선순위
+        int third[] = new int[7]; //세번째 우선순위
 
         for(int i = 0; i < 7; i++){
             if(classes[i] > 0){ //클래스가 하나이상 있을 경우에만 확인
-                //해당 i가 클래스 번호임
+                //해당 i가 클래스 인덱스 번호임
+                //0:볼라드, 1:기둥, 2:사람, 3:기타 장애물, 4:킥보드, 5:자전거, 6:자동차
+
                 if(i == 0){
-                    coordinate(f,bollard);
+                    coordinate(f,bollard); //좌표로 좌, 우, 중앙 영역 중 어디에 위치하는지 확인
                     for(int g = 0; g < bollard.size(); g++){
-                        if(bollard.get(g) == 1){
+                        if(bollard.get(g) == 1){ //우선순위 1이라면 첫번째 우선순위에 개수 추가
                             first[i]++;
-                        }else if(bollard.get(g) == 2){
+                        }else if(bollard.get(g) == 2){ //우선순위 2이라면 두번째 우선순위에 개수 추가
                             second[i]++;
-                        }else{
+                        }else{ //우선순위 3이라면 세번째 우선순위에 개수 추가
                             third[i]++;
                         }
                     }
@@ -382,124 +380,102 @@ public class CameraActivity extends AppCompatActivity implements CvCameraViewLis
             }
         }
 
-        speakClasses(first, second, third);
+        speakClasses(first, second, third); //장애물 갯수가 담긴 우선순위 배열을 사용하여 음성안내
 
     }
 
-    public void coordinate(Size f, List<Integer> A){ //좌표 확인 후 우선순위 확인
+    public void coordinate(Size f, List<Integer> A){
+        //좌표 확인 후 해당 좌표 대체하고 우선순위 써주기
         int priority = 0;
-
 
         for(int k = 0; k < A.size(); k++){
             Log.i(TAG, "A.get(" + k + "): " + A.get(k));
-            priority = location(f, A.get(k));
-            A.set(k,priority);
+            priority = location(f, A.get(k)); //세 영역중 어디에 해당하는지 확인
+            A.set(k,priority); //좌표 대체후 우선순위 써주기
 
         }
     }
 
 
     public int location(Size f, int midX){
+        //세 영역 중 어디에 해당하는지 확인
 
-        double wid = f.width;
+        double wid = f.width; //프레임의 가로 길이 받아오기
 
         double left = wid/3;
         double right = wid/3*2;
+        //3등분으로 나누기
 
-        if(midX < left){ //대각선 좌측
+        if(midX < left){ //좌측:우선순위2
             return 2;
-        }else if(left <= midX & midX < right){ //중앙
+        }else if(left <= midX & midX < right){ //중앙:우선순위1
             return 1;
-        }else{ //대각선 우측
+        }else{ //우측:우선순위3
             return 3;
         }
 
     }
 
-    public void speakClasses(int first[], int second[], int third[]) {
 
+    /*
+    영역별 안내 음성 출력
+    우선순위
+    firstSound() : 중앙
+    secondSound() : 좌측
+    thirdSound() : 우측
+    */
+
+
+    public void speakClasses(int first[], int second[], int third[]) {
+        //우선순위 순으로 음성 안내
         for(int j = 0; j < 7; j++){
-            if(first[j] > 0){
+            if(first[j] > 0){ //중앙
                 firstSound(j);
             }
         }
         for(int j = 0; j < 7; j++){
-            if(second[j] > 0){
+            if(second[j] > 0){ //좌측
                 secondSound(j);
             }
         }
         for(int j = 0; j < 7; j++){
-            if(third[j] > 0){
+            if(third[j] > 0){ //우측
                 thirdSound(j);
             }
         }
 
     }
-    public void firstSound(int j){
-        try {
-            if(j == 0){
-                mediaPlayer = MediaPlayer.create(CameraActivity.this, R.raw.bollard2);
-                mediaPlayer.start(); //장애물 안내 음성 출력
-                Thread.sleep(3000);
-            }else if(j == 1){
-                mediaPlayer = MediaPlayer.create(CameraActivity.this, R.raw.pole2);
-                mediaPlayer.start(); //장애물 안내 음성 출력
-                Thread.sleep(3000);
-            }else if(j == 2){
-                mediaPlayer = MediaPlayer.create(CameraActivity.this, R.raw.person2);
-                mediaPlayer.start(); //장애물 안내 음성 출력
-                Thread.sleep(3000);
-            }else if(j == 3){
-                mediaPlayer = MediaPlayer.create(CameraActivity.this, R.raw.etc2);
-                mediaPlayer.start(); //장애물 안내 음성 출력
-                Thread.sleep(3000);
-            }else if(j == 4){
-                mediaPlayer = MediaPlayer.create(CameraActivity.this, R.raw.kickboard2);
-                mediaPlayer.start(); //장애물 안내 음성 출력
-                Thread.sleep(3000);
-            }else if(j == 5){
-                mediaPlayer = MediaPlayer.create(CameraActivity.this, R.raw.bicycle2);
-                mediaPlayer.start(); //장애물 안내 음성 출력
-                Thread.sleep(3000);
-            }else{
-                mediaPlayer = MediaPlayer.create(CameraActivity.this, R.raw.car2);
-                mediaPlayer.start(); //장애물 안내 음성 출력
-                Thread.sleep(3000);
-            }
-        }catch (InterruptedException e){
-            throw new RuntimeException(e);
-        }
-    }
 
-    public void secondSound(int j){
+
+    public void firstSound(int j){ //중앙 음성
         try {
             if(j == 0){
                 mediaPlayer = MediaPlayer.create(CameraActivity.this, R.raw.bollard1);
-                mediaPlayer.start(); //장애물 안내 음성 출력
+                mediaPlayer.start(); //볼라드 안내 음성 출력
                 Thread.sleep(3000);
             }else if(j == 1){
                 mediaPlayer = MediaPlayer.create(CameraActivity.this, R.raw.pole1);
-                mediaPlayer.start(); //장애물 안내 음성 출력
+                mediaPlayer.start(); //기둥 안내 음성 출력
                 Thread.sleep(3000);
             }else if(j == 2){
                 mediaPlayer = MediaPlayer.create(CameraActivity.this, R.raw.person1);
-                mediaPlayer.start(); //장애물 안내 음성 출력
+                mediaPlayer.start(); //사람 안내 음성 출력
                 Thread.sleep(3000);
             }else if(j == 3){
                 mediaPlayer = MediaPlayer.create(CameraActivity.this, R.raw.etc1);
-                mediaPlayer.start(); //장애물 안내 음성 출력
+                mediaPlayer.start(); //기타 장애물 안내 음성 출력
                 Thread.sleep(3000);
             }else if(j == 4){
                 mediaPlayer = MediaPlayer.create(CameraActivity.this, R.raw.kickboard1);
-                mediaPlayer.start(); //장애물 안내 음성 출력
+                mediaPlayer.start(); //킥보드 안내 음성 출력
                 Thread.sleep(3000);
             }else if(j == 5){
                 mediaPlayer = MediaPlayer.create(CameraActivity.this, R.raw.bicycle1);
-                mediaPlayer.start(); //장애물 안내 음성 출력
+                mediaPlayer.start(); //자전거 안내 음성 출력
                 Thread.sleep(3000);
             }else{
                 mediaPlayer = MediaPlayer.create(CameraActivity.this, R.raw.car1);
-                mediaPlayer.start(); //장애물 안내 음성 출력
+                mediaPlayer.start(); //자동차 안내 음성 출력
                 Thread.sleep(3000);
             }
         }catch (InterruptedException e){
@@ -507,35 +483,71 @@ public class CameraActivity extends AppCompatActivity implements CvCameraViewLis
         }
     }
 
-    public void thirdSound(int j){
+    public void secondSound(int j){ //좌측 음성
+        try {
+            if(j == 0){
+                mediaPlayer = MediaPlayer.create(CameraActivity.this, R.raw.bollard2);
+                mediaPlayer.start(); //볼라드 안내 음성 출력
+                Thread.sleep(3000);
+            }else if(j == 1){
+                mediaPlayer = MediaPlayer.create(CameraActivity.this, R.raw.pole2);
+                mediaPlayer.start(); //기둥 안내 음성 출력
+                Thread.sleep(3000);
+            }else if(j == 2){
+                mediaPlayer = MediaPlayer.create(CameraActivity.this, R.raw.person2);
+                mediaPlayer.start(); //사람 안내 음성 출력
+                Thread.sleep(3000);
+            }else if(j == 3){
+                mediaPlayer = MediaPlayer.create(CameraActivity.this, R.raw.etc2);
+                mediaPlayer.start(); //기타 장애물 안내 음성 출력
+                Thread.sleep(3000);
+            }else if(j == 4){
+                mediaPlayer = MediaPlayer.create(CameraActivity.this, R.raw.kickboard2);
+                mediaPlayer.start(); //킥보드 안내 음성 출력
+                Thread.sleep(3000);
+            }else if(j == 5){
+                mediaPlayer = MediaPlayer.create(CameraActivity.this, R.raw.bicycle2);
+                mediaPlayer.start(); //자전거 안내 음성 출력
+                Thread.sleep(3000);
+            }else{
+                mediaPlayer = MediaPlayer.create(CameraActivity.this, R.raw.car2);
+                mediaPlayer.start(); //자동차 안내 음성 출력
+                Thread.sleep(3000);
+            }
+        }catch (InterruptedException e){
+            throw new RuntimeException(e);
+        }
+    }
+
+    public void thirdSound(int j){ //우측 음성
         try {
             if(j == 0){
                 mediaPlayer = MediaPlayer.create(CameraActivity.this, R.raw.bollard3);
-                mediaPlayer.start(); //장애물 안내 음성 출력
+                mediaPlayer.start(); //볼라드 안내 음성 출력
                 Thread.sleep(3000);
             }else if(j == 1){
                 mediaPlayer = MediaPlayer.create(CameraActivity.this, R.raw.pole3);
-                mediaPlayer.start(); //장애물 안내 음성 출력
+                mediaPlayer.start(); //기둥 안내 음성 출력
                 Thread.sleep(3000);
             }else if(j == 2){
                 mediaPlayer = MediaPlayer.create(CameraActivity.this, R.raw.person3);
-                mediaPlayer.start(); //장애물 안내 음성 출력
+                mediaPlayer.start(); //사람 안내 음성 출력
                 Thread.sleep(3000);
             }else if(j == 3){
                 mediaPlayer = MediaPlayer.create(CameraActivity.this, R.raw.etc3);
-                mediaPlayer.start(); //장애물 안내 음성 출력
+                mediaPlayer.start(); //기타 장애물 안내 음성 출력
                 Thread.sleep(3000);
             }else if(j == 4){
                 mediaPlayer = MediaPlayer.create(CameraActivity.this, R.raw.kickboard3);
-                mediaPlayer.start(); //장애물 안내 음성 출력
+                mediaPlayer.start(); //킥보드 안내 음성 출력
                 Thread.sleep(3000);
             }else if(j == 5){
                 mediaPlayer = MediaPlayer.create(CameraActivity.this, R.raw.bicycle3);
-                mediaPlayer.start(); //장애물 안내 음성 출력
+                mediaPlayer.start(); //자전거 안내 음성 출력
                 Thread.sleep(3000);
             }else{
                 mediaPlayer = MediaPlayer.create(CameraActivity.this, R.raw.car3);
-                mediaPlayer.start(); //장애물 안내 음성 출력
+                mediaPlayer.start(); //자동차 안내 음성 출력
                 Thread.sleep(3000);
             }
         }catch (InterruptedException e){
@@ -543,283 +555,6 @@ public class CameraActivity extends AppCompatActivity implements CvCameraViewLis
         }
     }
 
-//    public void naviFunc(Size f, int classes[], int midX[], int midY[]){
-//        int priority[] = new int[8];
-//        for(int i = 0; i < 7; i++){
-//            if(classes[i] == 1){
-//                int whereX = midX[i];
-//                int whereY = midY[i];
-//
-//                priority[i] = location(f, whereX, whereY); //우선순위 정하기
-//
-//                Log.i(TAG, "크기 : " + f);
-//                Log.i(TAG, "위치 : " + midX[i] + ", " + midY[i]);
-//
-//                //speakClasses(i, priority);
-//
-//            }
-//            else if(classes[i] > 1){
-//                priority[i] = 7; //여러개 있을때
-//                Log.i(TAG, "여러개 있을때");
-//                //speakClasses(i,midX);
-//            }
-//
-//        }
-//        speakClasses(priority);
-//
-//    }
-//
-//    public int location(Size f, int midX, int midY){
-//
-//        double wid = f.width;
-//        double hei = f.height;
-//
-//        double left = wid/3;
-//        double right = wid/3*2;
-//        double row = hei/2;
-//
-//        if(midX < left){ //대각선 좌측
-//            if(midY >= row) //아래
-//                return 3;
-//            else //위
-//                return 5;
-//
-//        }else if(left <= midX & midX < right){ //전방
-//            if(midY >= row) //아래
-//                return 1;
-//            else //위
-//                return 2;
-//
-//        }else{ //대각선 우측
-//            if(midY >= row) //아래
-//                return 4;
-//            else //위
-//                return 6;
-//        }
-//
-//    }
-//
-//    public void speakClasses(int pri[]) {
-//        try {
-//            for (int i = 0; i < 7; i++) {
-//
-//                if (pri[i] == 7) { //여러개 있을 때
-//                    if (i == 0) {
-//                        mediaPlayer = MediaPlayer.create(CameraActivity.this, R.raw.bollard);
-//                        mediaPlayer.start(); //장애물 안내 음성 출력
-//                        Thread.sleep(3000); //음성 겹치지 않게 3초 기다리기
-//                    } else if (i == 1) {
-//                        mediaPlayer = MediaPlayer.create(CameraActivity.this, R.raw.pole);
-//                        mediaPlayer.start();
-//                        Thread.sleep(3000);
-//                    } else if (i == 2) {
-//                        mediaPlayer = MediaPlayer.create(CameraActivity.this, R.raw.person);
-//                        mediaPlayer.start();
-//                        Thread.sleep(3000);
-//                    } else if (i == 3) {
-//                        mediaPlayer = MediaPlayer.create(CameraActivity.this, R.raw.etc);
-//                        mediaPlayer.start();
-//                        Thread.sleep(3000);
-//                    } else if (i == 4) {
-//                        mediaPlayer = MediaPlayer.create(CameraActivity.this, R.raw.kickboard);
-//                        mediaPlayer.start();
-//                        Thread.sleep(3000);
-//                    } else if (i == 5) {
-//                        mediaPlayer = MediaPlayer.create(CameraActivity.this, R.raw.bicycle);
-//                        mediaPlayer.start();
-//                        Thread.sleep(3000);
-//                    } else {
-//                        mediaPlayer = MediaPlayer.create(CameraActivity.this, R.raw.car);
-//                        mediaPlayer.start();
-//                        Thread.sleep(3000);
-//                    }
-//                } else if (pri[i] == 1) { //중앙 가까이
-//                    if (i == 0) {
-//                        mediaPlayer = MediaPlayer.create(CameraActivity.this, R.raw.bollard2);
-//                        mediaPlayer.start(); //장애물 안내 음성 출력
-//                        Thread.sleep(3000); //음성 겹치지 않게 3초 기다리기
-//                    } else if (i == 1) {
-//                        mediaPlayer = MediaPlayer.create(CameraActivity.this, R.raw.pole2);
-//                        mediaPlayer.start();
-//                        Thread.sleep(3000);
-//                    } else if (i == 2) {
-//                        mediaPlayer = MediaPlayer.create(CameraActivity.this, R.raw.person2);
-//                        mediaPlayer.start();
-//                        Thread.sleep(3000);
-//                    } else if (i == 3) {
-//                        mediaPlayer = MediaPlayer.create(CameraActivity.this, R.raw.etc2);
-//                        mediaPlayer.start();
-//                        Thread.sleep(3000);
-//                    } else if (i == 4) {
-//                        mediaPlayer = MediaPlayer.create(CameraActivity.this, R.raw.kickboard2);
-//                        mediaPlayer.start();
-//                        Thread.sleep(3000);
-//                    } else if (i == 5) {
-//                        mediaPlayer = MediaPlayer.create(CameraActivity.this, R.raw.bicycle2);
-//                        mediaPlayer.start();
-//                        Thread.sleep(3000);
-//                    } else {
-//                        mediaPlayer = MediaPlayer.create(CameraActivity.this, R.raw.car2);
-//                        mediaPlayer.start();
-//                        Thread.sleep(3000);
-//                    }
-//                } else if (pri[i] == 2) { //중앙 멀리
-//                    if (i == 0) {
-//                        mediaPlayer = MediaPlayer.create(CameraActivity.this, R.raw.bollard2);
-//                        mediaPlayer.start(); //장애물 안내 음성 출력
-//                        Thread.sleep(3000); //음성 겹치지 않게 3초 기다리기
-//                    } else if (i == 1) {
-//                        mediaPlayer = MediaPlayer.create(CameraActivity.this, R.raw.pole2);
-//                        mediaPlayer.start();
-//                        Thread.sleep(3000);
-//                    } else if (i == 2) {
-//                        mediaPlayer = MediaPlayer.create(CameraActivity.this, R.raw.person2);
-//                        mediaPlayer.start();
-//                        Thread.sleep(3000);
-//                    } else if (i == 3) {
-//                        mediaPlayer = MediaPlayer.create(CameraActivity.this, R.raw.etc2);
-//                        mediaPlayer.start();
-//                        Thread.sleep(3000);
-//                    } else if (i == 4) {
-//                        mediaPlayer = MediaPlayer.create(CameraActivity.this, R.raw.kickboard2);
-//                        mediaPlayer.start();
-//                        Thread.sleep(3000);
-//                    } else if (i == 5) {
-//                        mediaPlayer = MediaPlayer.create(CameraActivity.this, R.raw.bicycle2);
-//                        mediaPlayer.start();
-//                        Thread.sleep(3000);
-//                    } else {
-//                        mediaPlayer = MediaPlayer.create(CameraActivity.this, R.raw.car2);
-//                        mediaPlayer.start();
-//                        Thread.sleep(3000);
-//                    }
-//                } else if (pri[i] == 3) { //왼쪽 가까이
-//                    if (i == 0) {
-//                        mediaPlayer = MediaPlayer.create(CameraActivity.this, R.raw.bollard1);
-//                        mediaPlayer.start(); //장애물 안내 음성 출력
-//                        Thread.sleep(3000); //음성 겹치지 않게 3초 기다리기
-//                    } else if (i == 1) {
-//                        mediaPlayer = MediaPlayer.create(CameraActivity.this, R.raw.pole1);
-//                        mediaPlayer.start();
-//                        Thread.sleep(3000);
-//                    } else if (i == 2) {
-//                        mediaPlayer = MediaPlayer.create(CameraActivity.this, R.raw.person1);
-//                        mediaPlayer.start();
-//                        Thread.sleep(3000);
-//                    } else if (i == 3) {
-//                        mediaPlayer = MediaPlayer.create(CameraActivity.this, R.raw.etc1);
-//                        mediaPlayer.start();
-//                        Thread.sleep(3000);
-//                    } else if (i == 4) {
-//                        mediaPlayer = MediaPlayer.create(CameraActivity.this, R.raw.kickboard1);
-//                        mediaPlayer.start();
-//                        Thread.sleep(3000);
-//                    } else if (i == 5) {
-//                        mediaPlayer = MediaPlayer.create(CameraActivity.this, R.raw.bicycle1);
-//                        mediaPlayer.start();
-//                        Thread.sleep(3000);
-//                    } else {
-//                        mediaPlayer = MediaPlayer.create(CameraActivity.this, R.raw.car1);
-//                        mediaPlayer.start();
-//                        Thread.sleep(3000);
-//                    }
-//                } else if (pri[i] == 4) { //오른쪽 가까이
-//                    if (i == 0) {
-//                        mediaPlayer = MediaPlayer.create(CameraActivity.this, R.raw.bollard3);
-//                        mediaPlayer.start(); //장애물 안내 음성 출력
-//                        Thread.sleep(3000); //음성 겹치지 않게 3초 기다리기
-//                    } else if (i == 1) {
-//                        mediaPlayer = MediaPlayer.create(CameraActivity.this, R.raw.pole3);
-//                        mediaPlayer.start();
-//                        Thread.sleep(3000);
-//                    } else if (i == 2) {
-//                        mediaPlayer = MediaPlayer.create(CameraActivity.this, R.raw.person3);
-//                        mediaPlayer.start();
-//                        Thread.sleep(3000);
-//                    } else if (i == 3) {
-//                        mediaPlayer = MediaPlayer.create(CameraActivity.this, R.raw.etc3);
-//                        mediaPlayer.start();
-//                        Thread.sleep(3000);
-//                    } else if (i == 4) {
-//                        mediaPlayer = MediaPlayer.create(CameraActivity.this, R.raw.kickboard3);
-//                        mediaPlayer.start();
-//                        Thread.sleep(3000);
-//                    } else if (i == 5) {
-//                        mediaPlayer = MediaPlayer.create(CameraActivity.this, R.raw.bicycle3);
-//                        mediaPlayer.start();
-//                        Thread.sleep(3000);
-//                    } else {
-//                        mediaPlayer = MediaPlayer.create(CameraActivity.this, R.raw.car3);
-//                        mediaPlayer.start();
-//                        Thread.sleep(3000);
-//                    }
-//                } else if (pri[i] == 5) { //왼쪽 멀리
-//                    if (i == 0) {
-//                        mediaPlayer = MediaPlayer.create(CameraActivity.this, R.raw.bollard1);
-//                        mediaPlayer.start(); //장애물 안내 음성 출력
-//                        Thread.sleep(3000); //음성 겹치지 않게 3초 기다리기
-//                    } else if (i == 1) {
-//                        mediaPlayer = MediaPlayer.create(CameraActivity.this, R.raw.pole1);
-//                        mediaPlayer.start();
-//                        Thread.sleep(3000);
-//                    } else if (i == 2) {
-//                        mediaPlayer = MediaPlayer.create(CameraActivity.this, R.raw.person1);
-//                        mediaPlayer.start();
-//                        Thread.sleep(3000);
-//                    } else if (i == 3) {
-//                        mediaPlayer = MediaPlayer.create(CameraActivity.this, R.raw.etc1);
-//                        mediaPlayer.start();
-//                        Thread.sleep(3000);
-//                    } else if (i == 4) {
-//                        mediaPlayer = MediaPlayer.create(CameraActivity.this, R.raw.kickboard1);
-//                        mediaPlayer.start();
-//                        Thread.sleep(3000);
-//                    } else if (i == 5) {
-//                        mediaPlayer = MediaPlayer.create(CameraActivity.this, R.raw.bicycle1);
-//                        mediaPlayer.start();
-//                        Thread.sleep(3000);
-//                    } else {
-//                        mediaPlayer = MediaPlayer.create(CameraActivity.this, R.raw.car1);
-//                        mediaPlayer.start();
-//                        Thread.sleep(3000);
-//                    }
-//                } else if (pri[i] == 6) { //오른쪽 멀리
-//                    if (i == 0) {
-//                        mediaPlayer = MediaPlayer.create(CameraActivity.this, R.raw.bollard3);
-//                        mediaPlayer.start(); //장애물 안내 음성 출력
-//                        Thread.sleep(3000); //음성 겹치지 않게 3초 기다리기
-//                    } else if (i == 1) {
-//                        mediaPlayer = MediaPlayer.create(CameraActivity.this, R.raw.pole3);
-//                        mediaPlayer.start();
-//                        Thread.sleep(3000);
-//                    } else if (i == 2) {
-//                        mediaPlayer = MediaPlayer.create(CameraActivity.this, R.raw.person3);
-//                        mediaPlayer.start();
-//                        Thread.sleep(3000);
-//                    } else if (i == 3) {
-//                        mediaPlayer = MediaPlayer.create(CameraActivity.this, R.raw.etc3);
-//                        mediaPlayer.start();
-//                        Thread.sleep(3000);
-//                    } else if (i == 4) {
-//                        mediaPlayer = MediaPlayer.create(CameraActivity.this, R.raw.kickboard3);
-//                        mediaPlayer.start();
-//                        Thread.sleep(3000);
-//                    } else if (i == 5) {
-//                        mediaPlayer = MediaPlayer.create(CameraActivity.this, R.raw.bicycle3);
-//                        mediaPlayer.start();
-//                        Thread.sleep(3000);
-//                    } else {
-//                        mediaPlayer = MediaPlayer.create(CameraActivity.this, R.raw.car3);
-//                        mediaPlayer.start();
-//                        Thread.sleep(3000);
-//                    }
-//                }
-//            }
-//        }catch (InterruptedException e){
-//            throw new RuntimeException(e);
-//        }
-//
-//    }
 
     //YOLOv4 모델 관련 파일 읽어오기
     private static String getAssetsFile(String file, Context context) {
